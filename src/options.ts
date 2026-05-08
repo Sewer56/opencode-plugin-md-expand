@@ -1,5 +1,5 @@
 import path from "node:path"
-import { MAX_DEPTH } from "./constants"
+import { MAX_DEPTH } from "./token-syntax"
 
 export interface MdExpandOptions {
   maxDepth?: number

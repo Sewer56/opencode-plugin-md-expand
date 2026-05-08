@@ -1,18 +1,42 @@
 import path from "node:path"
 import type { ExpandContext, ProtectedRange } from "../types"
 import type { ResolvedMdExpandOptions } from "../options"
-import { FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "../constants"
-import { parseFileTemplate } from "../template-parser"
+import { FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "../token-syntax"
+import { parseFileTemplate } from "../template-file-parser"
 import { advanceRangeIndex, isInRange } from "../ranges"
 import { shouldExpandForCondition } from "../conditions"
 import { createDebugLogger } from "../debug"
-import { resolvePath, formatArgsForCall, formatArgsForLog } from "../utils"
-import { hasExpandableToken } from "../template-parser"
+import { resolvePath } from "../path-resolver"
+import { hasExpandableToken } from "../template-detection"
 import { expand } from "../expand"
 
 function recordDiagnostic(ctx: ExpandContext, diagnostic: { kind: string; token: string; rawPath?: string; resolved?: string; message: string }): void {
   ctx.diagnostics?.push(diagnostic as any)
   ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`)
+}
+
+/**
+ * Format args as `key=value` pairs separated by spaces (for debug logging of calls).
+ */
+function formatArgsForCall(args: Map<string, string>): string {
+  let out = ""
+  for (const [key, value] of args) {
+    if (out) out += " "
+    out += `${key}=${value}`
+  }
+  return out
+}
+
+/**
+ * Format args as `key=value` pairs separated by commas (for human-readable logging).
+ */
+function formatArgsForLog(args: Map<string, string>): string {
+  let out = ""
+  for (const [key, value] of args) {
+    if (out) out += ", "
+    out += `${key}=${value}`
+  }
+  return out
 }
 
 /**

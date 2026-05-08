@@ -1,7 +1,7 @@
 import type { ProtectedRange, SyncExpandResult, ReplacementRange } from "../types"
 import type { ResolvedMdExpandOptions } from "../options"
-import { ENV_PREFIX, TOKEN_END, EMPTY_EXPANSION_MARKER } from "../constants"
-import { collectFileArgRanges } from "../template-parser"
+import { ENV_PREFIX, TOKEN_END, EMPTY_EXPANSION_MARKER } from "../token-syntax"
+import { collectFileArgRanges } from "../template-file-parser"
 import { advanceRangeIndex, isInRange, mergeRanges } from "../ranges"
 import { createDebugLogger } from "../debug"
 

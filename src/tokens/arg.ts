@@ -1,6 +1,6 @@
 import type { ProtectedRange, SyncExpandResult } from "../types"
 import type { ResolvedMdExpandOptions } from "../options"
-import { ARG_PREFIX, TOKEN_END, TOKEN_START, EMPTY_EXPANSION_MARKER } from "../constants"
+import { ARG_PREFIX, TOKEN_END, TOKEN_START, EMPTY_EXPANSION_MARKER } from "../token-syntax"
 import { createDebugLogger } from "../debug"
 
 /**

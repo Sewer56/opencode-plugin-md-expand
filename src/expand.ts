@@ -1,19 +1,19 @@
 import type { ExpandContext, ExpansionDiagnostic, ExpandWithDiagnosticsResult } from "./types"
 import type { ResolvedMdExpandOptions } from "./options"
-import { MAX_DEPTH, TOKEN_START, ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER, EMPTY_RANGES } from "./constants"
+import { MAX_DEPTH, TOKEN_START, ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER, EMPTY_RANGES } from "./token-syntax"
 import { expandArgTokens } from "./tokens/arg"
 import { expandEnvTokens } from "./tokens/env"
 import { expandFileTokens } from "./tokens/file"
 import { expandInlineConditionals } from "./tokens/conditional"
 import { mergeRanges } from "./ranges"
-import { collectFileArgRanges, hasExpandableToken } from "./template-parser"
-import { stripEmptyExpansionMarkers, resolvePath } from "./utils"
+import { collectFileArgRanges } from "./template-file-parser"
+import { hasExpandableToken } from "./template-detection"
 import { createDebugLogger } from "./debug"
 
 // Re-export for external consumers
-export { resolvePath } from "./utils"
-export { hasExpandableToken } from "./template-parser"
-export { MAX_DEPTH } from "./constants"
+export { resolvePath } from "./path-resolver"
+export { hasExpandableToken } from "./template-detection"
+export { MAX_DEPTH } from "./token-syntax"
 
 function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {
   ctx.diagnostics?.push(diagnostic)
@@ -105,4 +105,49 @@ export async function expand(
   const maxDepth = options?.maxDepth ?? MAX_DEPTH
   if (ctx.depth >= maxDepth) return stripEmptyExpansionMarkers(text)
   return stripEmptyExpansionMarkers(await expandFileTokens(text, baseDir, ctx, protectedRanges, options))
+}
+
+/**
+ * Remove lines that consist solely of empty-expansion markers.
+ *
+ * When a token expands to nothing (e.g., missing file or undefined arg), the
+ * marker occupies a line; stripping the whole line avoids blank-line artifacts.
+ * Inline markers on non-empty lines are just removed in-place.
+ */
+function stripEmptyExpansionMarkers(text: string): string {
+  if (text.indexOf(EMPTY_EXPANSION_MARKER) === -1) return text
+
+  let out = ""
+  let lineStart = 0
+  while (lineStart < text.length) {
+    let lineEnd = lineStart
+    while (lineEnd < text.length) {
+      const code = text.charCodeAt(lineEnd)
+      if (code === 10 || code === 13) break
+      lineEnd++
+    }
+
+    let nextLine = lineEnd
+    if (nextLine < text.length) {
+      if (text.charCodeAt(nextLine) === 13 && text.charCodeAt(nextLine + 1) === 10) {
+        nextLine += 2
+      } else {
+        nextLine++
+      }
+    }
+
+    const line = text.slice(lineStart, lineEnd)
+    if (line.indexOf(EMPTY_EXPANSION_MARKER) !== -1) {
+      const withoutMarkers = line.split(EMPTY_EXPANSION_MARKER).join("")
+      if (withoutMarkers.trim().length !== 0) {
+        out += withoutMarkers + text.slice(lineEnd, nextLine)
+      }
+    } else {
+      out += text.slice(lineStart, nextLine)
+    }
+
+    lineStart = nextLine
+  }
+
+  return out
 }
