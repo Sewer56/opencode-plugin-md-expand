@@ -1,0 +1,108 @@
+import type { ExpandContext, ExpansionDiagnostic, ExpandWithDiagnosticsResult } from "./types"
+import type { ResolvedMdExpandOptions } from "./options"
+import { MAX_DEPTH, TOKEN_START, ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER, EMPTY_RANGES } from "./constants"
+import { expandArgTokens } from "./tokens/arg"
+import { expandEnvTokens } from "./tokens/env"
+import { expandFileTokens } from "./tokens/file"
+import { expandInlineConditionals } from "./tokens/conditional"
+import { mergeRanges } from "./ranges"
+import { collectFileArgRanges, hasExpandableToken } from "./template-parser"
+import { stripEmptyExpansionMarkers, resolvePath } from "./utils"
+import { createDebugLogger } from "./debug"
+
+// Re-export for external consumers
+export { resolvePath } from "./utils"
+export { hasExpandableToken } from "./template-parser"
+export { MAX_DEPTH } from "./constants"
+
+function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {
+  ctx.diagnostics?.push(diagnostic)
+  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`)
+}
+
+/**
+ * Expand a text string with diagnostics collection.
+ */
+export async function expandWithDiagnostics(
+  text: string,
+  baseDir: string,
+  options?: ResolvedMdExpandOptions,
+): Promise<ExpandWithDiagnosticsResult> {
+  const diagnostics: ExpansionDiagnostic[] = []
+  const logger = options?.debug ? createDebugLogger(options) : undefined
+  const expanded = await expand(text, baseDir, options, {
+    visited: new Set(),
+    depth: 0,
+    readCache: new Map(),
+    args: options?.initialArgs ?? EMPTY_ARGS,
+    diagnostics,
+    options,
+    logger,
+  })
+  return { text: expanded, diagnostics }
+}
+
+/**
+ * Expand {{arg:key}}, {{env:VAR}}, inline `{{ if=... }}` blocks, and
+ * `{{ file="path" }}` templates in `text`.
+ *
+ * Arg substitution runs first (synchronous), then environment substitution
+ * (synchronous), then inline conditional substitution (synchronous), then file
+ * substitution (async reads). File content is recursively expanded if it contains
+ * further templates, up to MAX_DEPTH levels deep.
+ */
+export async function expand(
+  text: string,
+  baseDir: string,
+  options?: ResolvedMdExpandOptions,
+  ctx?: ExpandContext,
+): Promise<string> {
+  if (text.indexOf(TOKEN_START) === -1) return text
+
+  if (!ctx) {
+    const logger = options?.debug ? createDebugLogger(options) : undefined
+    ctx = {
+      visited: new Set(),
+      depth: 0,
+      readCache: new Map(),
+      args: options?.initialArgs ?? EMPTY_ARGS,
+      options,
+      logger,
+    }
+  }
+
+  const hasArg = text.includes(ARG_PREFIX)
+  const hasEnv = text.includes(ENV_PREFIX)
+  const hasTemplate = text.includes(FILE_TEMPLATE_START)
+  let hasFile = hasTemplate
+  if (!hasArg && !hasEnv && !hasTemplate) return text
+
+  let protectedRanges = EMPTY_RANGES
+
+  if (hasArg) {
+    const argResult = expandArgTokens(text, ctx.args, options)
+    text = argResult.text
+    protectedRanges = argResult.protectedRanges
+  }
+
+  if (hasEnv) {
+    const envResult = expandEnvTokens(text, protectedRanges, options)
+    text = envResult.text
+    protectedRanges = envResult.protectedRanges
+  }
+
+  if (hasTemplate) {
+    const inlineProtectedRanges = mergeRanges(
+      protectedRanges,
+      collectFileArgRanges(text, protectedRanges),
+    )
+    text = expandInlineConditionals(text, ctx, inlineProtectedRanges, options)
+  }
+
+  if (!hasFile) hasFile = text.includes(FILE_TEMPLATE_START)
+  if (!hasFile) return stripEmptyExpansionMarkers(text)
+  // Depth gate: at maxDepth, leave file templates as literal text.
+  const maxDepth = options?.maxDepth ?? MAX_DEPTH
+  if (ctx.depth >= maxDepth) return stripEmptyExpansionMarkers(text)
+  return stripEmptyExpansionMarkers(await expandFileTokens(text, baseDir, ctx, protectedRanges, options))
+}
