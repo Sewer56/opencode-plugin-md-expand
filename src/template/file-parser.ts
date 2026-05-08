@@ -1,4 +1,4 @@
-import type { ProtectedRange } from "./types"
+import type { ProtectedRange } from "../types"
 import type { IfCondition } from "./conditions"
 import {
   FILE_TEMPLATE_START,
@@ -6,10 +6,10 @@ import {
   FILE_ATTR,
   IF_ATTR,
   EMPTY_RANGES,
-} from "./token-syntax"
-import { advanceRangeIndex, isInRange } from "./ranges"
+} from "../token-syntax"
+import { advanceRangeIndex, isInRange } from "../ranges"
 import { parseIfCondition } from "./conditions"
-import { skipTemplateSpace, scanTemplateKey, readTemplateValue, isValidArgKey } from "./template-scanner"
+import { skipTemplateSpace, scanTemplateKey, readTemplateValue, isValidArgKey } from "./scanner"
 
 interface FileTemplateSpec {
   rawPath: string

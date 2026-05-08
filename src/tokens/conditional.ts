@@ -5,9 +5,9 @@ import {
   EMPTY_EXPANSION_MARKER,
   EMPTY_ARGS,
 } from "../token-syntax"
-import { parseInlineIfTemplate, findMatchingInlineEndif } from "../template-conditional-parser"
+import { parseInlineIfTemplate, findMatchingInlineEndif } from "../template/conditional-parser"
 import { advanceRangeIndex, isInRange } from "../ranges"
-import { shouldExpandForCondition } from "../conditions"
+import { shouldExpandForCondition } from "../template/conditions"
 import { createDebugLogger } from "../debug"
 
 /**

@@ -1,5 +1,5 @@
-import { ENV_CONDITION_PREFIX } from "./token-syntax"
-import { isValidArgKey, isValidEnvKey } from "./template-scanner"
+import { ENV_CONDITION_PREFIX } from "../token-syntax"
+import { isValidArgKey, isValidEnvKey } from "./scanner"
 
 export interface IfCondition {
   source: "arg" | "env"

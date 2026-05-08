@@ -1,13 +1,13 @@
-import type { ProtectedRange } from "./types"
+import type { ProtectedRange } from "../types"
 import type { IfCondition } from "./conditions"
 import {
   FILE_TEMPLATE_START,
   FILE_TEMPLATE_END,
   IF_ATTR,
   ENDIF_ATTR,
-} from "./token-syntax"
-import { advanceRangeIndex, isInRange } from "./ranges"
-import { skipTemplateSpace, scanTemplateKey, readTemplateValue } from "./template-scanner"
+} from "../token-syntax"
+import { advanceRangeIndex, isInRange } from "../ranges"
+import { skipTemplateSpace, scanTemplateKey, readTemplateValue } from "./scanner"
 import { parseIfCondition } from "./conditions"
 
 interface InlineIfTemplateSpec {

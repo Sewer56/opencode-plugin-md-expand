@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit",
-    "test": "bun test test/md-expand.test.ts",
+    "test": "bun test",
     "check": "bun run typecheck && bun run test && bun run build"
   },
   "keywords": ["opencode", "opencode-plugin", "markdown", "prompt", "templates"],

@@ -6,13 +6,13 @@ import { expandEnvTokens } from "./tokens/env"
 import { expandFileTokens } from "./tokens/file"
 import { expandInlineConditionals } from "./tokens/conditional"
 import { mergeRanges } from "./ranges"
-import { collectFileArgRanges } from "./template-file-parser"
-import { hasExpandableToken } from "./template-detection"
+import { collectFileArgRanges } from "./template/file-parser"
+import { hasExpandableToken } from "./template/detection"
 import { createDebugLogger } from "./debug"
 
 // Re-export for external consumers
 export { resolvePath } from "./path-resolver"
-export { hasExpandableToken } from "./template-detection"
+export { hasExpandableToken } from "./template/detection"
 export { MAX_DEPTH } from "./token-syntax"
 
 function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {

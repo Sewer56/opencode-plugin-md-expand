@@ -107,7 +107,7 @@ opencode-plugin-md-expand --help
 From source:
 
 ```sh
-bun src/cli.ts --help
+bun src/cli/cli.ts --help
 ```
 
 ### Validate templates

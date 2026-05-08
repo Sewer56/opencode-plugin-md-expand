@@ -1,5 +1,5 @@
-import { TOKEN_START, ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, FILE_ATTR, IF_ATTR } from "./token-syntax"
-import { isTemplateSpace } from "./template-scanner"
+import { TOKEN_START, ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, FILE_ATTR, IF_ATTR } from "../token-syntax"
+import { isTemplateSpace } from "./scanner"
 
 /** Fast check for `{{ file=... }}`. Requires `file` first by style rule. Rejects `{{arg:}}` and `{{env:}}`. */
 function startsFileTemplate(text: string, start: number): boolean {
