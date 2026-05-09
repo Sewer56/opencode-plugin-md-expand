@@ -16,7 +16,7 @@ describe("resolvePath", () => {
   });
 
   test("./... resolves relative to baseDir", () => {
-    expect(resolvePath("./src/main.ts", base)).toBe("/project/src/main.ts");
+    expect(resolvePath("./src/main.ts", base)).toBe(path.resolve(base, "./src/main.ts"));
   });
 
   test("../... resolves relative to baseDir", () => {
@@ -26,10 +26,11 @@ describe("resolvePath", () => {
   });
 
   test("absolute path used as-is", () => {
-    expect(resolvePath("/etc/hosts", base)).toBe("/etc/hosts");
+    const absPath = path.resolve("/etc/hosts");
+    expect(resolvePath(absPath, base)).toBe(absPath);
   });
 
   test("bare name (no prefix) resolves relative to baseDir", () => {
-    expect(resolvePath("README.md", base)).toBe("/project/README.md");
+    expect(resolvePath("README.md", base)).toBe(path.resolve(base, "README.md"));
   });
 });
