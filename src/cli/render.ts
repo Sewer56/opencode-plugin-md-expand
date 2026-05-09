@@ -4,10 +4,19 @@ import path from "node:path";
 import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
 import { expand } from "../expand";
-import { resolveMdExpandOptions } from "../options";
-import { parseCommonArgs, resolveInputPath, type CliDefaults } from "./shared";
+import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
+import { parseCommonArgs, resolveInputPath, lineColumn, type CliDefaults } from "./shared";
 
-export async function runRenderCli(args: string[], defaults?: CliDefaults): Promise<number> {
+export interface RenderOptions {
+  inputFile: string;
+  outputFile?: string;
+  configDir?: string;
+  maxDepth?: number;
+  debug?: boolean;
+  arg?: Record<string, string>;
+}
+
+export async function runRenderCommand(args: string[], defaults?: CliDefaults): Promise<number> {
   if (args.includes("--help") || args.includes("-h")) {
     printRenderHelp(defaults?.programName ?? "opencode-plugin-md-expand render");
     return args.length === 0 ? 1 : 0;
@@ -21,9 +30,33 @@ export async function runRenderCli(args: string[], defaults?: CliDefaults): Prom
     return 1;
   }
 
-  const inputPath = resolveInputPath(positional[0], configDir);
-  const outputArg = positional[1];
-  const resolved = resolveMdExpandOptions(rawOptions);
+  return executeRender(positional[0], positional[1], {
+    configDir,
+    maxDepth: rawOptions.maxDepth,
+    debug: rawOptions.debug,
+    arg: rawOptions.initialArgs
+      ? rawOptions.initialArgs instanceof Map
+        ? Object.fromEntries(rawOptions.initialArgs)
+        : rawOptions.initialArgs
+      : {},
+  });
+}
+
+export async function executeRender(
+  inputFile: string,
+  outputFile: string | undefined,
+  options: Omit<RenderOptions, "inputFile" | "outputFile">,
+): Promise<number> {
+  const configDir = options.configDir ?? process.cwd();
+  const inputPath = resolveInputPath(inputFile, configDir);
+
+  const mdOptions: MdExpandOptions = {
+    configDirs: options.configDir ? [options.configDir] : [],
+    maxDepth: options.maxDepth,
+    debug: options.debug,
+    initialArgs: options.arg,
+  };
+  const resolved = resolveMdExpandOptions(mdOptions);
   const effectiveOptions = {
     ...resolved,
     configDirs: resolved.configDirs.length ? resolved.configDirs : defaultConfigDirs(configDir),
@@ -45,8 +78,8 @@ export async function runRenderCli(args: string[], defaults?: CliDefaults): Prom
   const expanded = await expand(input, configDir, effectiveOptions);
   logger.log(`render: expanded ${input.length} → ${expanded.length} chars`);
 
-  if (outputArg) {
-    const outputPath = path.resolve(process.cwd(), outputArg);
+  if (outputFile) {
+    const outputPath = path.resolve(process.cwd(), outputFile);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, expanded);
     console.error(`Wrote ${expanded.split("\n").length} lines to ${outputPath}`);
@@ -65,11 +98,15 @@ Usage:
 
 Options:
   --config-dir <path>   Config directory for relative includes (default: auto-discover)
-  --max-depth <n>        Maximum recursive file include depth (default: 10)
-  --debug                Write debug log
-  --arg key=value        Initial arg for top-level expansion; repeatable
-  --help, -h             Show this help
+  --max-depth <n>       Maximum recursive file include depth (default: 10)
+  --debug               Write debug log
+  --arg key=value       Initial arg for top-level expansion; repeatable
+  --help, -h            Show this help
 
 If output-file is omitted, result is written to stdout.
 `);
 }
+
+// Re-export for backwards compatibility
+export { parseCommonArgs, resolveInputPath, lineColumn };
+export type { CliDefaults };

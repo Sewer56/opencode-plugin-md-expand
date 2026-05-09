@@ -1,48 +1,85 @@
 #!/usr/bin/env node
-import { runRenderCli } from "./render";
-import { runValidateCli } from "./validate";
+import path from "node:path";
 
-async function main(): Promise<number> {
-  const args = process.argv.slice(2);
-  const command = args[0];
+import { Command } from "commander";
 
-  if (command === "render" || command === "r") {
-    return runRenderCli(args.slice(1));
-  } else if (command === "validate" || command === "v") {
-    return runValidateCli(args.slice(1));
-  } else if (command === "--help" || command === "-h" || !command) {
-    console.log(`opencode-plugin-md-expand: Expand Markdown prompt templates
+import { executeRender } from "./render";
+import { executeValidate } from "./validate";
 
-Usage:
-  opencode-plugin-md-expand render [options] [input-file]
-  opencode-plugin-md-expand validate [options] [paths...]
+function collectArg(value: string, previous: Record<string, string>): Record<string, string> {
+  const eq = value.indexOf("=");
+  if (eq <= 0) throw new Error("--arg requires key=value");
+  return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) };
+}
 
-Commands:
+function resolvePath(value: string): string {
+  return path.resolve(value);
+}
+
+const program = new Command();
+
+program
+  .name("opencode-plugin-md-expand")
+  .description("Expand Markdown prompt templates")
+  .version("0.1.0")
+  .addHelpText(
+    "after",
+    `\nCommands:
   render    Expand a template file and output the result
   validate  Scan template files and report diagnostics
 
-Options:
-  --config-dir <path>   Set config directory (overrides OPENCODE_CONFIG_DIR and cwd)
-  --max-depth <n>       Maximum recursion depth (default: 10)
-  --debug               Enable debug logging
-  --arg key=value       Pass initial args for expansion
-  --help, -h            Show this help
+Use "opencode-plugin-md-expand <command> --help" for command-specific options.`,
+  );
 
-Use "render --help" or "validate --help" for command-specific options.
-`);
-    return 0;
-  } else {
-    console.error(`Unknown command: ${command}`);
-    console.error("Use --help for usage information.");
-    return 1;
-  }
-}
-
-main()
-  .then((code) => {
-    process.exitCode = code;
+program
+  .command("render")
+  .alias("r")
+  .description("Expand a template file and output the result")
+  .argument("<input-file>", "input template file")
+  .argument("[output-file]", "output file (default: stdout)")
+  .option("--config-dir <path>", "config directory", resolvePath)
+  .option("--max-depth <n>", "maximum recursion depth", (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new Error("--max-depth must be a non-negative number");
+    }
+    return n;
   })
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
+  .option("--debug", "enable debug logging")
+  .option("--arg <key=value>", "initial args for expansion (repeatable)", collectArg, {})
+  .action(async (inputFile, outputFile, opts) => {
+    const exitCode = await executeRender(inputFile, outputFile, {
+      configDir: opts.configDir,
+      maxDepth: opts.maxDepth,
+      debug: opts.debug,
+      arg: opts.arg,
+    });
+    process.exitCode = exitCode;
   });
+
+program
+  .command("validate")
+  .alias("v")
+  .description("Scan template files and report diagnostics")
+  .argument("[paths...]", "paths to scan")
+  .option("--config-dir <path>", "config directory", resolvePath)
+  .option("--max-depth <n>", "maximum recursion depth", (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new Error("--max-depth must be a non-negative number");
+    }
+    return n;
+  })
+  .option("--debug", "enable debug logging")
+  .option("--arg <key=value>", "initial args for expansion (repeatable)", collectArg, {})
+  .action(async (paths, opts) => {
+    const exitCode = await executeValidate(paths || [], {
+      configDir: opts.configDir,
+      maxDepth: opts.maxDepth,
+      debug: opts.debug,
+      arg: opts.arg,
+    });
+    process.exitCode = exitCode;
+  });
+
+program.parse();

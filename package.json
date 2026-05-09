@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.14.41",
+    "commander": "^14.0.0",
     "xdg-basedir": "^5.1.0"
   },
   "devDependencies": {

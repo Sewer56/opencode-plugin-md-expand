@@ -4,10 +4,18 @@ import path from "node:path";
 import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
 import { expandWithDiagnostics, hasExpandableToken } from "../expand";
-import { resolveMdExpandOptions } from "../options";
+import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
 import { parseCommonArgs, resolveInputPath, lineColumn, type CliDefaults } from "./shared";
 
-export async function runValidateCli(args: string[], defaults?: CliDefaults): Promise<number> {
+export interface ValidateOptions {
+  paths?: string[];
+  configDir?: string;
+  maxDepth?: number;
+  debug?: boolean;
+  arg?: Record<string, string>;
+}
+
+export async function runValidateCommand(args: string[], defaults?: CliDefaults): Promise<number> {
   if (args.includes("--help") || args.includes("-h")) {
     printValidateHelp(defaults?.programName ?? "opencode-plugin-md-expand validate");
     return 0;
@@ -16,7 +24,31 @@ export async function runValidateCli(args: string[], defaults?: CliDefaults): Pr
   const parsed = parseCommonArgs(args, defaults);
   const { configDir, options: rawOptions, positional } = parsed;
 
-  const resolved = resolveMdExpandOptions(rawOptions);
+  return executeValidate(positional, {
+    configDir,
+    maxDepth: rawOptions.maxDepth,
+    debug: rawOptions.debug,
+    arg: rawOptions.initialArgs
+      ? rawOptions.initialArgs instanceof Map
+        ? Object.fromEntries(rawOptions.initialArgs)
+        : rawOptions.initialArgs
+      : {},
+  });
+}
+
+export async function executeValidate(
+  paths: string[],
+  options: Omit<ValidateOptions, "paths">,
+): Promise<number> {
+  const configDir = options.configDir ?? process.cwd();
+
+  const mdOptions: MdExpandOptions = {
+    configDirs: options.configDir ? [options.configDir] : [],
+    maxDepth: options.maxDepth,
+    debug: options.debug,
+    initialArgs: options.arg,
+  };
+  const resolved = resolveMdExpandOptions(mdOptions);
   const effectiveOptions = {
     ...resolved,
     configDirs: resolved.configDirs.length ? resolved.configDirs : defaultConfigDirs(configDir),
@@ -26,7 +58,7 @@ export async function runValidateCli(args: string[], defaults?: CliDefaults): Pr
     `validate: configDir=${configDir} configDirs=${JSON.stringify(effectiveOptions.configDirs)}`,
   );
 
-  const searchPaths = positional.length ? positional : [configDir];
+  const searchPaths = paths.length ? paths : [configDir];
   const templateFiles = collectTemplateFiles(searchPaths);
   logger.log(`validate: found ${templateFiles.length} template file(s)`);
 
@@ -90,10 +122,10 @@ Usage:
 
 Options:
   --config-dir <path>   Config directory for relative includes (default: auto-discover)
-  --max-depth <n>        Maximum recursive file include depth (default: 10)
-  --debug                Write debug log
-  --arg key=value        Initial arg for top-level expansion; repeatable
-  --help, -h             Show this help
+  --max-depth <n>       Maximum recursive file include depth (default: 10)
+  --debug               Write debug log
+  --arg key=value       Initial arg for top-level expansion; repeatable
+  --help, -h            Show this help
 
 If no paths are given, the config directory is scanned for template files.
 `);
@@ -224,3 +256,7 @@ function locateRemaining(
     message: "unclosed or malformed token",
   };
 }
+
+// Re-export for backwards compatibility
+export { parseCommonArgs, resolveInputPath, lineColumn };
+export type { CliDefaults };
