@@ -43,12 +43,12 @@ No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the
 
 ## Options
 
-| Option       | Type       | Default                                                        | Purpose                                                                                                               |
-| ------------ | ---------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `configDirs` | `string[]` | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir.                |
-| `maxDepth`   | `number`   | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                 |
-| `debug`      | `boolean`  | env-based                                                      | Write debug logs. Also enabled by `FILE_INTERP_DEBUG=1`, `MD_EXPAND_DEBUG=1`, or `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`. |
-| `logDir`     | `string`   | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                                  |
+| Option       | Type       | Default                                                        | Purpose                                                                                                |
+| ------------ | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `configDirs` | `string[]` | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir. |
+| `maxDepth`   | `number`   | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.  |
+| `debug`      | `boolean`  | env-based                                                      | Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                 |
+| `logDir`     | `string`   | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                   |
 
 ## Template grammar
 

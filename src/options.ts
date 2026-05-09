@@ -38,9 +38,8 @@ export interface ResolvedMdExpandOptions {
  *
  * All paths are resolved to absolute paths before return. `maxDepth` is
  * floored to an integer; negative or non-finite values fall back to `MAX_DEPTH`.
- * Debug mode is active when `debug: true` is set or any of the legacy env vars
- * `FILE_INTERP_DEBUG`, `MD_EXPAND_DEBUG`, or `OPENCODE_PLUGIN_MD_EXPAND_DEBUG`
- * are set to `"1"`.
+ * Debug mode is active when `debug: true` is set or the env var
+ * `OPENCODE_PLUGIN_MD_EXPAND_DEBUG` is set to `"1"`.
  *
  * @param options  - User-supplied partial options.
  * @param defaults - Default options to apply before user options (merged first).
@@ -52,7 +51,7 @@ export function resolveMdExpandOptions(
   const merged = { ...defaults, ...options } as MdExpandOptions;
   const configDirs = merged.configDirs?.length ? merged.configDirs.map((p) => path.resolve(p)) : [];
   const maxDepth = isValidMaxDepth(merged.maxDepth) ? Math.floor(merged.maxDepth) : MAX_DEPTH;
-  const debug = merged.debug === true || isLegacyDebugEnv();
+  const debug = merged.debug === true || isDebugEnv();
   const logDir = resolveLogDir(merged.logDir, configDirs);
 
   return {
@@ -69,13 +68,9 @@ function isValidMaxDepth(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-/** True when any of the three legacy debug env vars is set to `"1"`. */
-function isLegacyDebugEnv(): boolean {
-  return (
-    process.env.FILE_INTERP_DEBUG === "1" ||
-    process.env.MD_EXPAND_DEBUG === "1" ||
-    process.env.OPENCODE_PLUGIN_MD_EXPAND_DEBUG === "1"
-  );
+/** True when the debug env var `OPENCODE_PLUGIN_MD_EXPAND_DEBUG` is set to `"1"`. */
+function isDebugEnv(): boolean {
+  return process.env.OPENCODE_PLUGIN_MD_EXPAND_DEBUG === "1";
 }
 
 /** Resolve log directory: explicit path > first configDir/plugins/.logs > cwd/.logs. */

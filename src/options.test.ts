@@ -27,8 +27,8 @@ describe("resolveMdExpandOptions", () => {
     expect(o.initialArgs.get("x")).toBe("1");
   });
 
-  test("enables debug via legacy env var", () => {
-    const restore = withEnv("FILE_INTERP_DEBUG", "1");
+  test("enables debug via env var", () => {
+    const restore = withEnv("OPENCODE_PLUGIN_MD_EXPAND_DEBUG", "1");
     try {
       expect(resolveMdExpandOptions().debug).toBe(true);
     } finally {
