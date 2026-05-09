@@ -1,7 +1,7 @@
 import { createDebugLogger } from "../debug";
 import type { ResolvedMdExpandOptions } from "../options";
+import type { ProtectedRange, SyncExpandResult } from "../ranges";
 import { ARG_PREFIX, TOKEN_END, TOKEN_START, EMPTY_EXPANSION_MARKER } from "../token-syntax";
-import type { ProtectedRange, SyncExpandResult } from "../types/ranges";
 
 /**
  * Expand `{{arg:key}}` tokens with manual scanning.

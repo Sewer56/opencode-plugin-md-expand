@@ -8,4 +8,4 @@ export {
 } from "./expand";
 export { resolveMdExpandOptions } from "./options";
 export type { MdExpandOptions, ResolvedMdExpandOptions } from "./options";
-export type { ExpandWithDiagnosticsResult, ExpansionDiagnostic } from "./types/expand";
+export type { ExpandWithDiagnosticsResult, ExpansionDiagnostic } from "./expand";

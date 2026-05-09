@@ -1,6 +1,5 @@
-import { advanceRangeIndex, isInRange } from "../ranges";
+import { advanceRangeIndex, isInRange, type ProtectedRange } from "../ranges";
 import { FILE_TEMPLATE_START, FILE_TEMPLATE_END, IF_ATTR, ENDIF_ATTR } from "../token-syntax";
-import type { ProtectedRange } from "../types/ranges";
 import type { IfCondition } from "./conditions";
 import { parseIfCondition } from "./conditions";
 import { skipTemplateSpace, scanTemplateKey, readTemplateValue } from "./scanner";

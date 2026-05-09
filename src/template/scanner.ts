@@ -1,6 +1,5 @@
-import { advanceRangeIndex, isInRange } from "../ranges";
+import { advanceRangeIndex, isInRange, type ProtectedRange } from "../ranges";
 import { FILE_TEMPLATE_END } from "../token-syntax";
-import type { ProtectedRange } from "../types/ranges";
 
 /**
  * Parsed value result from reading a quoted or unquoted template attribute value.

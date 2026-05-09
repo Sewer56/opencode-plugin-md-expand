@@ -1,4 +1,4 @@
-import type { ProtectedRange } from "./types/ranges";
+import type { ProtectedRange } from "./ranges";
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  Token delimiters
