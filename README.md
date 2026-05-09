@@ -60,15 +60,15 @@ No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the
 
 ## Options
 
-| Option            | Type                     | Default                                                        | Purpose                                                                                                                                                                                  |
-| ----------------- | ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `configDirs`      | `string[]`               | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir. Replaces defaults entirely.                                                       |
-| `extraConfigDirs` | `string[]`               | `[]`                                                           | Additional directories **appended** to the auto-derived defaults. Ignored when `configDirs` is set. Ideal for `opencode.json` where runtime paths cannot be expressed as static strings. |
-| `maxDepth`        | `number`                 | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                                                                                    |
-| `debug`           | `boolean`                | env-based                                                      | Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                                   |
-| `logDir`          | `string`                 | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                                                                                                     |
-| `initialArgs`     | `Record<string, string>` | `{}`                                                           | Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                                               |
-| `cache`           | `boolean`                | `false`                                                        | Cache raw and recursively-expanded file content across plugin transform calls. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_CACHE=1`; leave off while editing config files.                |
+| Option            | Description                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `configDirs`      | `string[]` · default `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]`. Ordered fallback dirs for relative `{{ file="./..." }}` includes. Replaces defaults entirely.                     |
+| `extraConfigDirs` | `string[]` · default `[]`. Additional dirs **appended** to auto-derived defaults. Ignored when `configDirs` is set.                                                                                    |
+| `maxDepth`        | `number` · default `10`. Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                                                                         |
+| `debug`           | `boolean` · env-based. Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                          |
+| `logDir`          | `string` · default `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`. Debug log directory.                                                                                                     |
+| `initialArgs`     | `Record<string, string>` · default `{}`. Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                    |
+| `cache`           | `boolean` · default `false`. Cache raw and recursively-expanded file content across plugin transform calls. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_CACHE=1`; leave off while editing config files. |
 
 ## Template grammar
 
