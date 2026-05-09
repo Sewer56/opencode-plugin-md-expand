@@ -283,4 +283,122 @@ describe("expand: inline conditional blocks", () => {
     const result = await expand("{{ if=env:NONEXISTENT }}got it{{ endif }}", "/tmp", opts());
     expect(result.trim()).toBe("");
   });
+
+  // ── != inequality operator ────────────────────────────────────────────────
+
+  test("if=arg!=value includes block when arg differs", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": ["start", "{{ if=mode!=cached }}", "NOT-CACHED", "{{ endif }}", "end"].join(
+        "\n",
+      ),
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" mode=live }}`, dir, opts());
+    expect(result).toBe("start\nNOT-CACHED\nend");
+  });
+
+  test("if=arg!=value excludes block when arg matches", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": ["start", "{{ if=mode!=cached }}", "NOT-CACHED", "{{ endif }}", "end"].join(
+        "\n",
+      ),
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" mode=cached }}`, dir, opts());
+    expect(result).toBe("start\nend");
+  });
+
+  test("if=arg!= includes block when arg is absent (negated truthiness)", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": "before\n{{ if=flag!= }}\nNO-FLAG\n{{ endif }}\nafter",
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" }}`, dir, opts());
+    expect(result).toBe("before\nNO-FLAG\nafter");
+  });
+
+  test("if=arg!= excludes block when arg is present (negated truthiness)", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": "before\n{{ if=flag!= }}\nNO-FLAG\n{{ endif }}\nafter",
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" flag=1 }}`, dir, opts());
+    expect(result).toBe("before\nafter");
+  });
+
+  test("if=env:VAR!=value includes block when env var differs", async () => {
+    const restore = withEnv("MD_EXPAND_NEQ_MODE", "live");
+    try {
+      const result = await expand(
+        [
+          "start",
+          "{{ if=env:MD_EXPAND_NEQ_MODE!=cached }}",
+          "NOT-CACHED",
+          "{{ endif }}",
+          "end",
+        ].join("\n"),
+        "/tmp",
+        opts(),
+      );
+      expect(result).toBe("start\nNOT-CACHED\nend");
+    } finally {
+      restore();
+    }
+  });
+
+  test("if=env:VAR!=value excludes block when env var matches", async () => {
+    const restore = withEnv("MD_EXPAND_NEQ_MODE", "cached");
+    try {
+      const result = await expand(
+        [
+          "start",
+          "{{ if=env:MD_EXPAND_NEQ_MODE!=cached }}",
+          "NOT-CACHED",
+          "{{ endif }}",
+          "end",
+        ].join("\n"),
+        "/tmp",
+        opts(),
+      );
+      expect(result).toBe("start\nend");
+    } finally {
+      restore();
+    }
+  });
+
+  test("if=arg!=value with else includes false branch when arg matches", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": "prefix {{ if=mode!=cached }}NOT-CACHED{{ else }}CACHED{{ endif }} suffix",
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" mode=cached }}`, dir, opts());
+    expect(result).toBe("prefix CACHED suffix");
+  });
+
+  test("if=arg!=value with else includes true branch when arg differs", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": "prefix {{ if=mode!=cached }}NOT-CACHED{{ else }}CACHED{{ endif }} suffix",
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" mode=live }}`, dir, opts());
+    expect(result).toBe("prefix NOT-CACHED suffix");
+  });
+
+  test("if=arg!=value with initialArgs includes when differing", async () => {
+    const result = await expand(
+      "{{ if=mode!=cached }}Live{{ else }}Cached{{ endif }}",
+      "/tmp",
+      opts({ initialArgs: { mode: "live" } }),
+    );
+    expect(result).toBe("Live");
+  });
+
+  test("if=arg!=value with initialArgs excludes when matching", async () => {
+    const result = await expand(
+      "{{ if=mode!=cached }}Live{{ else }}Cached{{ endif }}",
+      "/tmp",
+      opts({ initialArgs: { mode: "cached" } }),
+    );
+    expect(result).toBe("Cached");
+  });
 });

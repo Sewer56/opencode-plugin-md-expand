@@ -115,10 +115,23 @@ Use cached review scope.
 Use cacheless review scope.
 {{ endif }}
 
+{{ if=mode!=cached }}
+Use cacheless review scope.
+{{ endif }}
+
 {{ if=env:CI }}
 CI-only instructions.
 {{ endif }}
+
+{{ if=env:CI!=true }}
+Local-only instructions.
+{{ endif }}
 ```
+
+Condition operators:
+
+- `==` - exact equality (`if=arg==value` includes when arg equals value)
+- `!=` - inequality (`if=arg!=value` includes when arg differs from value; `if=arg!=` includes when arg is empty or absent)
 
 ## CLI
 

@@ -337,6 +337,66 @@ describe("expand: file template if conditions", () => {
     const result = await expand(`{{ file="./extra.txt" if=mode=bad }}`, dir, opts());
     expect(result).toBe(`{{ file="./extra.txt" if=mode=bad }}`);
   });
+
+  // ── != inequality operator ────────────────────────────────────────────────
+
+  test("if=arg!=value includes when arg does not match", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": [
+        "start",
+        `{{ file="./cached.txt" if=mode!=cached }}`,
+        `{{ file="./cacheless.txt" if=mode!=cacheless }}`,
+        "end",
+      ].join("\n"),
+      "cached.txt": "CACHED",
+      "cacheless.txt": "CACHELESS",
+    });
+    cleanup.push(dir);
+
+    const cached = await expand(`{{ file="./outer.txt" mode=cached }}`, dir, opts());
+    const cacheless = await expand(`{{ file="./outer.txt" mode=cacheless }}`, dir, opts());
+
+    expect(cached).toBe("start\nCACHELESS\nend");
+    expect(cacheless).toBe("start\nCACHED\nend");
+  });
+
+  test("if=arg!=value excludes when arg matches", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": 'before\n{{ file="./extra.txt" if=mode!=cached }}\nafter',
+      "extra.txt": "EXTRA",
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./outer.txt" mode=cached }}`, dir, opts());
+    expect(result).toBe("before\nafter");
+  });
+
+  test("if=arg!= includes when arg is absent (negated truthiness)", async () => {
+    const dir = await makeTmpDir({ "extra.txt": "EXTRA" });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./extra.txt" if=flag!= }}`, dir, opts());
+    expect(result).toBe("EXTRA");
+  });
+
+  test("if=arg!= excludes when arg is present (negated truthiness)", async () => {
+    const dir = await makeTmpDir({ "extra.txt": "EXTRA" });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./extra.txt" if=flag!= flag=1 }}`, dir, opts());
+    expect(result).toBe("");
+  });
+
+  test("false if=arg!= does not read file", async () => {
+    const dir = await makeTmpDir({
+      "outer.txt": 'before\n{{ file="./missing.txt" if=mode!=cacheless }}\nafter',
+    });
+    cleanup.push(dir);
+    const result = await expandWithDiagnostics(
+      `{{ file="./outer.txt" mode=cacheless }}`,
+      dir,
+      opts(),
+    );
+    expect(result.text).toBe("before\nafter");
+    expect(result.diagnostics).toEqual([]);
+  });
 });
 
 describe("expand: config-dir fallback", () => {
