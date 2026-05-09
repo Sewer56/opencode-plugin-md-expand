@@ -17,8 +17,49 @@ interface FileTemplateSpec {
   condition?: IfCondition;
   /** Inclusive offset of the second `}` in the closing `}}`. */
   end: number;
-  /** Raw spans for non-file attr values; used only by collectFileArgRanges. */
+  /** Raw spans for non-file arg values; used only by collectFileArgRanges. */
   argValueRanges?: ProtectedRange[];
+}
+
+/**
+ * Find non-file arg value spans in `{{ file="..." key=value }}` templates.
+ *
+ * Example: in `{{ file="./tmpl" x="{{env:FOO}}" }}`, this returns the span
+ * covering `{{env:FOO}}`. The env pass ignores it at caller level; later,
+ * `parseFileTemplate` passes it as literal `x` to `tmpl`. The `file` value is
+ * not protected so `{{arg:topic}}` and `{{env:PATH_PART}}` can compose paths.
+ */
+export function collectFileArgRanges(
+  text: string,
+  protectedRanges: ProtectedRange[],
+): ProtectedRange[] {
+  if (text.indexOf(FILE_TEMPLATE_START) === -1) return EMPTY_RANGES;
+
+  const ranges: ProtectedRange[] = [];
+  let searchFrom = 0;
+  let protectedIndex = 0;
+
+  while (true) {
+    const start = text.indexOf(FILE_TEMPLATE_START, searchFrom);
+    if (start === -1) break;
+
+    protectedIndex = advanceRangeIndex(protectedRanges, protectedIndex, start);
+    if (isInRange(protectedRanges, protectedIndex, start)) {
+      searchFrom = protectedRanges[protectedIndex].end;
+      continue;
+    }
+
+    const parsed = parseFileTemplate(text, start, protectedRanges, true);
+    if (!parsed) {
+      searchFrom = start + FILE_TEMPLATE_START.length;
+      continue;
+    }
+
+    if (parsed.argValueRanges) ranges.push(...parsed.argValueRanges);
+    searchFrom = parsed.end + 1;
+  }
+
+  return ranges.length ? ranges : EMPTY_RANGES;
 }
 
 /**
@@ -112,45 +153,4 @@ export function parseFileTemplate(
   }
 
   return undefined;
-}
-
-/**
- * Find non-file arg value spans in `{{ file="..." key=value }}` templates.
- *
- * Example: in `{{ file="./tmpl" x="{{env:FOO}}" }}`, this returns the span
- * covering `{{env:FOO}}`. The env pass ignores it at caller level; later,
- * `parseFileTemplate` passes it as literal `x` to `tmpl`. The `file` value is
- * not protected so `{{arg:topic}}` and `{{env:PATH_PART}}` can compose paths.
- */
-export function collectFileArgRanges(
-  text: string,
-  protectedRanges: ProtectedRange[],
-): ProtectedRange[] {
-  if (text.indexOf(FILE_TEMPLATE_START) === -1) return EMPTY_RANGES;
-
-  const ranges: ProtectedRange[] = [];
-  let searchFrom = 0;
-  let protectedIndex = 0;
-
-  while (true) {
-    const start = text.indexOf(FILE_TEMPLATE_START, searchFrom);
-    if (start === -1) break;
-
-    protectedIndex = advanceRangeIndex(protectedRanges, protectedIndex, start);
-    if (isInRange(protectedRanges, protectedIndex, start)) {
-      searchFrom = protectedRanges[protectedIndex].end;
-      continue;
-    }
-
-    const parsed = parseFileTemplate(text, start, protectedRanges, true);
-    if (!parsed) {
-      searchFrom = start + FILE_TEMPLATE_START.length;
-      continue;
-    }
-
-    if (parsed.argValueRanges) ranges.push(...parsed.argValueRanges);
-    searchFrom = parsed.end + 1;
-  }
-
-  return ranges.length ? ranges : EMPTY_RANGES;
 }

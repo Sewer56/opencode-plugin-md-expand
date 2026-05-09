@@ -11,38 +11,6 @@ import { parseFileTemplate } from "../template/file-parser";
 import { FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "../token-syntax";
 import type { ExpandContext, ProtectedRange } from "../types";
 
-function recordDiagnostic(
-  ctx: ExpandContext,
-  diagnostic: { kind: string; token: string; rawPath?: string; resolved?: string; message: string },
-): void {
-  ctx.diagnostics?.push(diagnostic as any);
-  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`);
-}
-
-/**
- * Format args as `key=value` pairs separated by spaces (for debug logging of calls).
- */
-function formatArgsForCall(args: Map<string, string>): string {
-  let out = "";
-  for (const [key, value] of args) {
-    if (out) out += " ";
-    out += `${key}=${value}`;
-  }
-  return out;
-}
-
-/**
- * Format args as `key=value` pairs separated by commas (for human-readable logging).
- */
-function formatArgsForLog(args: Map<string, string>): string {
-  let out = "";
-  for (const [key, value] of args) {
-    if (out) out += ", ";
-    out += `${key}=${value}`;
-  }
-  return out;
-}
-
 /**
  * Expand `{{ file="path" }}` templates.
  */
@@ -244,6 +212,38 @@ async function readRawFile(
     });
     return EMPTY_EXPANSION_MARKER;
   }
+}
+
+function recordDiagnostic(
+  ctx: ExpandContext,
+  diagnostic: { kind: string; token: string; rawPath?: string; resolved?: string; message: string },
+): void {
+  ctx.diagnostics?.push(diagnostic as any);
+  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`);
+}
+
+/**
+ * Format args as `key=value` pairs separated by spaces (for debug logging of calls).
+ */
+function formatArgsForCall(args: Map<string, string>): string {
+  let out = "";
+  for (const [key, value] of args) {
+    if (out) out += " ";
+    out += `${key}=${value}`;
+  }
+  return out;
+}
+
+/**
+ * Format args as `key=value` pairs separated by commas (for human-readable logging).
+ */
+function formatArgsForLog(args: Map<string, string>): string {
+  let out = "";
+  for (const [key, value] of args) {
+    if (out) out += ", ";
+    out += `${key}=${value}`;
+  }
+  return out;
 }
 
 /**

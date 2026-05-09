@@ -5,29 +5,6 @@ import { collectFileArgRanges } from "../template/file-parser";
 import { ENV_PREFIX, TOKEN_END, EMPTY_EXPANSION_MARKER } from "../token-syntax";
 import type { ProtectedRange, SyncExpandResult, ReplacementRange } from "../types";
 
-function remapProtectedRanges(
-  ranges: ProtectedRange[],
-  replacements: ReplacementRange[],
-): ProtectedRange[] {
-  if (!ranges.length || !replacements.length) return ranges;
-
-  const out: ProtectedRange[] = [];
-  let replacementIndex = 0;
-  let delta = 0;
-  for (const range of ranges) {
-    while (
-      replacementIndex < replacements.length &&
-      replacements[replacementIndex].end <= range.start
-    ) {
-      const replacement = replacements[replacementIndex];
-      delta += replacement.length - (replacement.end - replacement.start);
-      replacementIndex++;
-    }
-    out.push({ start: range.start + delta, end: range.end + delta });
-  }
-  return out;
-}
-
 /**
  * Expand `{{env:VAR}}` tokens with manual scanning.
  */
@@ -84,4 +61,27 @@ export function expandEnvTokens(
       ? remapProtectedRanges(protectedRanges, replacements)
       : protectedRanges,
   };
+}
+
+function remapProtectedRanges(
+  ranges: ProtectedRange[],
+  replacements: ReplacementRange[],
+): ProtectedRange[] {
+  if (!ranges.length || !replacements.length) return ranges;
+
+  const out: ProtectedRange[] = [];
+  let replacementIndex = 0;
+  let delta = 0;
+  for (const range of ranges) {
+    while (
+      replacementIndex < replacements.length &&
+      replacements[replacementIndex].end <= range.start
+    ) {
+      const replacement = replacements[replacementIndex];
+      delta += replacement.length - (replacement.end - replacement.start);
+      replacementIndex++;
+    }
+    out.push({ start: range.start + delta, end: range.end + delta });
+  }
+  return out;
 }

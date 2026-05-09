@@ -8,10 +8,6 @@ import { resolveMdExpandOptions } from "./options";
 
 export const PLUGIN_ID = "opencode-plugin-md-expand";
 
-export function normalizePluginOptions(options?: PluginOptions): MdExpandOptions {
-  return (options as MdExpandOptions | undefined) ?? {};
-}
-
 export const MdExpandPlugin: Plugin = async (input, options) => {
   const pluginOptions = normalizePluginOptions(options);
   const resolved = resolveMdExpandOptions(pluginOptions);
@@ -42,3 +38,7 @@ export default {
   id: PLUGIN_ID,
   server: MdExpandPlugin,
 };
+
+export function normalizePluginOptions(options?: PluginOptions): MdExpandOptions {
+  return (options as MdExpandOptions | undefined) ?? {};
+}

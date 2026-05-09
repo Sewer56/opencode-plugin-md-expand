@@ -131,21 +131,6 @@ If no paths are given, the config directory is scanned for template files.
 `);
 }
 
-interface TemplateFile {
-  path: string;
-  content: string;
-}
-
-interface LocatedDiagnostic {
-  file: string;
-  line: number;
-  column: number;
-  kind: string;
-  token: string;
-  message: string;
-  rawPath?: string;
-}
-
 export function collectTemplateFiles(paths: string[]): string[] {
   const files: string[] = [];
   for (const p of paths) {
@@ -171,6 +156,26 @@ export function collectTemplateFilesFrom(dirOrFile: string, into: string[]): voi
 export function isTemplateFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
   return ext === ".md" || ext === ".txt" || ext === ".mdc" || ext === ".opencode";
+}
+
+interface TemplateFile {
+  path: string;
+  content: string;
+}
+
+interface LocatedDiagnostic {
+  file: string;
+  line: number;
+  column: number;
+  kind: string;
+  token: string;
+  message: string;
+  rawPath?: string;
+}
+
+interface TokenFailure {
+  token: string;
+  index: number;
 }
 
 function resolveDiagnostic(
@@ -206,11 +211,6 @@ function formatDiagnostic(loc: LocatedDiagnostic): string {
   out += `: ${loc.message}`;
   if (loc.rawPath) out += ` (path: ${loc.rawPath})`;
   return out;
-}
-
-interface TokenFailure {
-  token: string;
-  index: number;
 }
 
 function collectRemainingTokenFailures(text: string): TokenFailure[] {

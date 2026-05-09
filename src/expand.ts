@@ -24,11 +24,6 @@ export { resolvePath } from "./path-resolver";
 export { hasExpandableToken } from "./template/detection";
 export { MAX_DEPTH } from "./token-syntax";
 
-function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {
-  ctx.diagnostics?.push(diagnostic);
-  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`);
-}
-
 /**
  * Expand a text string with diagnostics collection.
  */
@@ -116,6 +111,11 @@ export async function expand(
   return stripEmptyExpansionMarkers(
     await expandFileTokens(text, baseDir, ctx, protectedRanges, options),
   );
+}
+
+function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {
+  ctx.diagnostics?.push(diagnostic);
+  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`);
 }
 
 /**

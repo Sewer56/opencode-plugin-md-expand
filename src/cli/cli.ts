@@ -6,16 +6,6 @@ import { Command } from "commander";
 import { executeRender } from "./render";
 import { executeValidate } from "./validate";
 
-function collectArg(value: string, previous: Record<string, string>): Record<string, string> {
-  const eq = value.indexOf("=");
-  if (eq <= 0) throw new Error("--arg requires key=value");
-  return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) };
-}
-
-function resolvePath(value: string): string {
-  return path.resolve(value);
-}
-
 const program = new Command();
 
 program
@@ -81,5 +71,15 @@ program
     });
     process.exitCode = exitCode;
   });
+
+function collectArg(value: string, previous: Record<string, string>): Record<string, string> {
+  const eq = value.indexOf("=");
+  if (eq <= 0) throw new Error("--arg requires key=value");
+  return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) };
+}
+
+function resolvePath(value: string): string {
+  return path.resolve(value);
+}
 
 program.parse();

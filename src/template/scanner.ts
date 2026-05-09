@@ -12,14 +12,14 @@ interface TemplateValue {
   next: number;
 }
 
-/** Template attrs may span lines; any common ASCII whitespace separates items. */
-export function isTemplateSpace(code: number): boolean {
-  return code === 32 || code === 9 || code === 10 || code === 13;
-}
-
 export function skipTemplateSpace(text: string, i: number): number {
   while (i < text.length && isTemplateSpace(text.charCodeAt(i))) i++;
   return i;
+}
+
+/** Template attrs may span lines; any common ASCII whitespace separates items. */
+export function isTemplateSpace(code: number): boolean {
+  return code === 32 || code === 9 || code === 10 || code === 13;
 }
 
 export function scanTemplateKey(text: string, i: number): number {
@@ -168,10 +168,10 @@ function decodeTemplateEscape(code: number): string {
   }
 }
 
-function isArgKeyStart(code: number): boolean {
-  return code === 95 || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
-}
-
 function isArgKeyChar(code: number): boolean {
   return isArgKeyStart(code) || code === 45 || (code >= 48 && code <= 57);
+}
+
+function isArgKeyStart(code: number): boolean {
+  return code === 95 || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
 }
