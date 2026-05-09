@@ -6,7 +6,7 @@ import {
   IF_ATTR,
   EMPTY_RANGES,
 } from "../token-syntax";
-import type { ProtectedRange } from "../types";
+import type { ProtectedRange } from "../types/ranges";
 import type { IfCondition } from "./conditions";
 import { parseIfCondition } from "./conditions";
 import { skipTemplateSpace, scanTemplateKey, readTemplateValue, isValidArgKey } from "./scanner";

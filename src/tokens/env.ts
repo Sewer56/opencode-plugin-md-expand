@@ -3,7 +3,7 @@ import type { ResolvedMdExpandOptions } from "../options";
 import { advanceRangeIndex, isInRange, mergeRanges } from "../ranges";
 import { collectFileArgRanges } from "../template/file-parser";
 import { ENV_PREFIX, TOKEN_END, EMPTY_EXPANSION_MARKER } from "../token-syntax";
-import type { ProtectedRange, SyncExpandResult, ReplacementRange } from "../types";
+import type { ProtectedRange, SyncExpandResult, ReplacementRange } from "../types/ranges";
 
 /**
  * Expand `{{env:VAR}}` tokens with manual scanning.

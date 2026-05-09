@@ -17,7 +17,11 @@ import { expandArgTokens } from "./tokens/arg";
 import { expandInlineConditionals } from "./tokens/conditional";
 import { expandEnvTokens } from "./tokens/env";
 import { expandFileTokens } from "./tokens/file";
-import type { ExpandContext, ExpansionDiagnostic, ExpandWithDiagnosticsResult } from "./types";
+import type {
+  ExpandContext,
+  ExpansionDiagnostic,
+  ExpandWithDiagnosticsResult,
+} from "./types/expand";
 
 // Re-export for external consumers
 export { resolvePath } from "./path-resolver";

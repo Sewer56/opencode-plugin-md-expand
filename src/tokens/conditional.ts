@@ -4,7 +4,8 @@ import { advanceRangeIndex, isInRange } from "../ranges";
 import { parseInlineIfTemplate, findMatchingInlineEndif } from "../template/conditional-parser";
 import { shouldExpandForCondition } from "../template/conditions";
 import { FILE_TEMPLATE_START, EMPTY_EXPANSION_MARKER, EMPTY_ARGS } from "../token-syntax";
-import type { ExpandContext, ProtectedRange } from "../types";
+import type { ExpandContext } from "../types/expand";
+import type { ProtectedRange } from "../types/ranges";
 
 /**
  * Expand inline conditional blocks in already arg/env-expanded text.

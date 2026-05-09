@@ -1,4 +1,4 @@
-import type { ProtectedRange } from "./types.js";
+import type { ProtectedRange } from "./types/ranges.js";
 
 /** Advance range cursor while `pos` is after current range. Ranges are sorted. */
 export function advanceRangeIndex(ranges: ProtectedRange[], index: number, pos: number): number {

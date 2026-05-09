@@ -1,4 +1,4 @@
-import type { ProtectedRange } from "./types";
+import type { ProtectedRange } from "./types/ranges";
 
 /** Token prefixes. Keep exact: no plain `$VAR`, `%VAR%`, or bare names. */
 export const TOKEN_START = "{";
