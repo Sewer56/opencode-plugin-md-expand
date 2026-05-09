@@ -95,6 +95,22 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
         output.system[i] = await expand(entry, input.directory, effectiveOptions);
       }
     },
+    "experimental.chat.messages.transform": async (
+      _input: unknown,
+      output: { messages: { info: { role: string }; parts: { type: string; text?: string }[] }[] },
+    ) => {
+      // Expand tokens in text parts of user messages.
+      for (const msg of output.messages) {
+        if (msg.info.role !== "user") continue;
+        for (let i = 0; i < msg.parts.length; i++) {
+          const part = msg.parts[i];
+          if (part.type !== "text" || !part.text) continue;
+          if (!hasExpandableToken(part.text)) continue;
+          logger.log(`user-message-part[${i}]: expanding tokens (${part.text.length} chars)`);
+          part.text = await expand(part.text, input.directory, effectiveOptions);
+        }
+      }
+    },
   } as unknown as Awaited<ReturnType<Plugin>>;
 };
 
