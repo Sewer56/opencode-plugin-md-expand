@@ -41,19 +41,44 @@ export const PLUGIN_ID = "opencode-plugin-md-expand";
  * system-prompt string, checks for expandable tokens, and replaces each entry
  * with its fully-expanded form.
  *
+ * `configDirs` overrides the default directories entirely. `extraConfigDirs`
+ * appends additional directories to the defaults and is useful in static
+ * config (e.g. `opencode.json`) where runtime paths like project root and cwd
+ * cannot be expressed. When `configDirs` is set, `extraConfigDirs` is ignored.
+ *
  * @param input   - OpenCode plugin input carrying the project directory.
  * @param options - Optional plugin options forwarded to `resolveMdExpandOptions`.
  * @returns Plugin hooks object consumed by the OpenCode runtime.
  */
+
+/**
+ * Compute the effective `configDirs` list from resolved options and the
+ * project directory.
+ *
+ * When `configDirs` is set (override mode) the caller-supplied list is
+ * returned as-is and `extraConfigDirs` is ignored. Otherwise the default
+ * directories (project root, cwd, XDG) are prepended and `extraConfigDirs`
+ * are appended (additive mode).
+ *
+ * @param resolved   - Fully resolved plugin options from `resolveMdExpandOptions`.
+ * @param projectDir - The project directory supplied by the OpenCode host.
+ * @returns The final list of config directories to use.
+ */
+export function resolveEffectiveConfigDirs(
+  resolved: { configDirs: string[]; extraConfigDirs: string[] },
+  projectDir: string,
+): string[] {
+  return resolved.configDirs.length
+    ? resolved.configDirs
+    : [...defaultConfigDirs(projectDir), ...resolved.extraConfigDirs];
+}
+
 export const MdExpandPlugin: Plugin = async (input, options) => {
   const pluginOptions = normalizePluginOptions(options);
   const resolved = resolveMdExpandOptions(pluginOptions);
   const effectiveOptions = {
     ...resolved,
-    // Fall back to project + XDG config dirs when the caller did not specify any.
-    configDirs: resolved.configDirs.length
-      ? resolved.configDirs
-      : defaultConfigDirs(input.directory),
+    configDirs: resolveEffectiveConfigDirs(resolved, input.directory),
   };
   const logger = createDebugLogger(effectiveOptions);
   logger.log(

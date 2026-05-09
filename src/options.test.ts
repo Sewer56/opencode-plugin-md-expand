@@ -11,6 +11,7 @@ describe("resolveMdExpandOptions", () => {
     expect(o.maxDepth).toBe(MAX_DEPTH);
     expect(o.debug).toBe(false);
     expect(o.configDirs).toEqual([]);
+    expect(o.extraConfigDirs).toEqual([]);
     expect(o.initialArgs).toBeInstanceOf(Map);
   });
 
@@ -34,5 +35,45 @@ describe("resolveMdExpandOptions", () => {
     } finally {
       restore();
     }
+  });
+
+  describe("extraConfigDirs", () => {
+    test("defaults to empty array", () => {
+      const o = resolveMdExpandOptions();
+      expect(o.extraConfigDirs).toEqual([]);
+    });
+
+    test("resolves extraConfigDirs to absolute paths", () => {
+      const o = resolveMdExpandOptions({
+        extraConfigDirs: ["./extra", "/abs/path"],
+      });
+      expect(o.extraConfigDirs).toEqual([path.resolve("./extra"), path.resolve("/abs/path")]);
+    });
+
+    test("extraConfigDirs does not affect configDirs", () => {
+      const o = resolveMdExpandOptions({
+        extraConfigDirs: ["/extra"],
+      });
+      // configDirs stays empty - extraConfigDirs is additive, not a replacement
+      expect(o.configDirs).toEqual([]);
+      expect(o.extraConfigDirs).toEqual([path.resolve("/extra")]);
+    });
+
+    test("configDirs and extraConfigDirs can coexist in resolved options", () => {
+      const o = resolveMdExpandOptions({
+        configDirs: ["/override"],
+        extraConfigDirs: ["/extra"],
+      });
+      expect(o.configDirs).toEqual([path.resolve("/override")]);
+      expect(o.extraConfigDirs).toEqual([path.resolve("/extra")]);
+      // The merge logic in index.ts handles precedence (configDirs wins as override).
+    });
+
+    test("empty extraConfigDirs array yields empty resolved array", () => {
+      const o = resolveMdExpandOptions({
+        extraConfigDirs: [],
+      });
+      expect(o.extraConfigDirs).toEqual([]);
+    });
   });
 });

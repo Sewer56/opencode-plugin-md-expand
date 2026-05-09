@@ -5,16 +5,22 @@ import { MAX_DEPTH } from "./token-syntax";
 /**
  * Options accepted by the markdown-expand plugin.
  *
- * @property maxDepth   - Maximum nesting depth for file-template expansion. Defaults to 10.
- * @property debug      - Enable verbose debug logging for template parsing and expansion.
- * @property configDirs - Directories to search for plugin config files. Resolved relative to process.cwd().
- * @property logDir     - Directory for debug logs. Resolved relative to the first configDir, or process.cwd().
- * @property initialArgs - Key-value pairs to inject as `{{arg:*}}` variables. Accepts a plain object or a Map.
+ * @property maxDepth        - Maximum nesting depth for file-template expansion. Defaults to 10.
+ * @property debug           - Enable verbose debug logging for template parsing and expansion.
+ * @property configDirs      - Directories to search for plugin config files. When set, replaces the
+ *                             default dirs entirely. Resolved relative to process.cwd().
+ * @property extraConfigDirs - Additional directories appended to the default config dirs. Ignored when
+ *                             `configDirs` is also set (override takes precedence). Resolved relative
+ *                             to process.cwd(). Useful in `opencode.json` where dynamic defaults
+ *                             (project root, cwd) cannot be expressed as static paths.
+ * @property logDir          - Directory for debug logs. Resolved relative to the first configDir, or process.cwd().
+ * @property initialArgs     - Key-value pairs to inject as `{{arg:*}}` variables. Accepts a plain object or a Map.
  */
 export interface MdExpandOptions {
   maxDepth?: number;
   debug?: boolean;
   configDirs?: string[];
+  extraConfigDirs?: string[];
   logDir?: string;
   initialArgs?: Record<string, string> | Map<string, string>;
 }
@@ -28,6 +34,7 @@ export interface ResolvedMdExpandOptions {
   maxDepth: number;
   debug: boolean;
   configDirs: string[];
+  extraConfigDirs: string[];
   logDir: string;
   initialArgs: Map<string, string>;
 }
@@ -50,6 +57,9 @@ export function resolveMdExpandOptions(
 ): ResolvedMdExpandOptions {
   const merged = { ...defaults, ...options } as MdExpandOptions;
   const configDirs = merged.configDirs?.length ? merged.configDirs.map((p) => path.resolve(p)) : [];
+  const extraConfigDirs = merged.extraConfigDirs?.length
+    ? merged.extraConfigDirs.map((p) => path.resolve(p))
+    : [];
   const maxDepth = isValidMaxDepth(merged.maxDepth) ? Math.floor(merged.maxDepth) : MAX_DEPTH;
   const debug = merged.debug === true || isDebugEnv();
   const logDir = resolveLogDir(merged.logDir, configDirs);
@@ -58,6 +68,7 @@ export function resolveMdExpandOptions(
     maxDepth,
     debug,
     configDirs,
+    extraConfigDirs,
     logDir,
     initialArgs: normalizeArgs(merged.initialArgs),
   };

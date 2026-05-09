@@ -37,18 +37,37 @@ If your config lives in a non-standard location, override with `configDirs`:
 }
 ```
 
+> `configDirs` **replaces** the three auto-derived defaults entirely. If you only want to _add_ directories while keeping the defaults (project root, cwd, XDG), use `extraConfigDirs` instead:
+
+```jsonc
+{
+  "plugin": [
+    [
+      "plugins/opencode-plugin-md-expand",
+      {
+        "extraConfigDirs": ["{env:HOME}/.config/opencode/extra-md"],
+      },
+    ],
+  ],
+}
+```
+
+OpenCode applies `{env:VAR}` substitution to the raw JSON before the plugin sees it, so `{env:HOME}` expands to your home directory at config-load time. This is the recommended way to express absolute paths in `opencode.json` since the runtime defaults (project root, cwd) cannot be written as static strings.
+
 The CLI and wrapper scripts also respect `OPENCODE_CONFIG_DIR` for runtime overrides.
 
 No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the submodule directory, finds `index.ts`, and loads the plugin directly.
 
 ## Options
 
-| Option       | Type       | Default                                                        | Purpose                                                                                                |
-| ------------ | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `configDirs` | `string[]` | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir. |
-| `maxDepth`   | `number`   | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.  |
-| `debug`      | `boolean`  | env-based                                                      | Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                 |
-| `logDir`     | `string`   | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                   |
+| Option            | Type                     | Default                                                        | Purpose                                                                                                                                                                                  |
+| ----------------- | ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `configDirs`      | `string[]`               | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir. Replaces defaults entirely.                                                       |
+| `extraConfigDirs` | `string[]`               | `[]`                                                           | Additional directories **appended** to the auto-derived defaults. Ignored when `configDirs` is set. Ideal for `opencode.json` where runtime paths cannot be expressed as static strings. |
+| `maxDepth`        | `number`                 | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                                                                                    |
+| `debug`           | `boolean`                | env-based                                                      | Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                                   |
+| `logDir`          | `string`                 | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                                                                                                     |
+| `initialArgs`     | `Record<string, string>` | `{}`                                                           | Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                                               |
 
 ## Template grammar
 
@@ -172,6 +191,12 @@ import { expand, expandWithDiagnostics, resolvePath, MAX_DEPTH } from "opencode-
 // configDirs auto-derives to OpenCode-standard paths
 const text = await expand(source, projectDir, {
   maxDepth: 10,
+});
+
+// extraConfigDirs appends to auto-derived defaults
+const text2 = await expand(source, projectDir, {
+  extraConfigDirs: ["/custom/config"],
+  initialArgs: { mode: "cached", domain: "correctness" },
 });
 
 const result = await expandWithDiagnostics(source, projectDir);
