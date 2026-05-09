@@ -50,28 +50,11 @@ export function resolveMdExpandOptions(
   defaults?: MdExpandOptions,
 ): ResolvedMdExpandOptions {
   const merged = { ...defaults, ...options } as MdExpandOptions;
-  const configDirs =
-    merged.configDirs && merged.configDirs.length
-      ? merged.configDirs.map((p) => path.resolve(p))
-      : [];
-  // Floor to discard fractional depth values; depth must be a non-negative integer.
-  const maxDepth =
-    typeof merged.maxDepth === "number" && Number.isFinite(merged.maxDepth) && merged.maxDepth >= 0
-      ? Math.floor(merged.maxDepth)
-      : MAX_DEPTH;
-  // Support three legacy env-var names so existing setups keep working after rename.
-  const debug =
-    merged.debug === true ||
-    process.env.FILE_INTERP_DEBUG === "1" ||
-    process.env.MD_EXPAND_DEBUG === "1" ||
-    process.env.OPENCODE_PLUGIN_MD_EXPAND_DEBUG === "1";
-  // Fall back to configDir[0]/plugins/.logs, then to cwd/.logs when no config dirs exist.
-  const logDir =
-    typeof merged.logDir === "string" && merged.logDir.length
-      ? path.resolve(merged.logDir)
-      : configDirs.length
-        ? path.join(configDirs[0], "plugins", ".logs", "opencode-plugin-md-expand")
-        : path.join(process.cwd(), ".logs", "opencode-plugin-md-expand");
+  const configDirs = merged.configDirs?.length ? merged.configDirs.map((p) => path.resolve(p)) : [];
+  const maxDepth = isValidMaxDepth(merged.maxDepth) ? Math.floor(merged.maxDepth) : MAX_DEPTH;
+  const debug = merged.debug === true || isLegacyDebugEnv();
+  const logDir = resolveLogDir(merged.logDir, configDirs);
+
   return {
     maxDepth,
     debug,
@@ -81,7 +64,29 @@ export function resolveMdExpandOptions(
   };
 }
 
-// Normalise initialArgs to a Map<string, string>. Converts plain-object keys to strings.
+/** True when `value` is a finite non-negative number (valid maxDepth). */
+function isValidMaxDepth(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+/** True when any of the three legacy debug env vars is set to `"1"`. */
+function isLegacyDebugEnv(): boolean {
+  return (
+    process.env.FILE_INTERP_DEBUG === "1" ||
+    process.env.MD_EXPAND_DEBUG === "1" ||
+    process.env.OPENCODE_PLUGIN_MD_EXPAND_DEBUG === "1"
+  );
+}
+
+/** Resolve log directory: explicit path > first configDir/plugins/.logs > cwd/.logs. */
+function resolveLogDir(logDir: string | undefined, configDirs: string[]): string {
+  if (typeof logDir === "string" && logDir.length) return path.resolve(logDir);
+  if (configDirs.length)
+    return path.join(configDirs[0], "plugins", ".logs", "opencode-plugin-md-expand");
+  return path.join(process.cwd(), ".logs", "opencode-plugin-md-expand");
+}
+
+/** Normalise initialArgs to a Map<string, string>. Converts plain-object keys to strings. */
 function normalizeArgs(args: MdExpandOptions["initialArgs"]): Map<string, string> {
   if (!args) return new Map();
   if (args instanceof Map) return new Map(args);
