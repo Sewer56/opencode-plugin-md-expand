@@ -1,0 +1,71 @@
+```text
+# REVIEW
+{{ if=mode==cached }}Cache: <cache_path>
+{{ endif }}{{ if=has_actions_path }}Actions: <actions_path>
+{{ endif }}{{ if=agent }}Agent: {{arg:agent}}
+{{ endif }}Decision: PASS | ADVISORY | BLOCKING
+{{ if=domains }}Domains: {{arg:domains}}
+{{ endif }}IDs: {{arg:prefix}}-001, {{arg:prefix}}-002, ...
+
+## Findings
+{{
+  file="./agent/_templates/review-finding.txt"
+  prefix="{{arg:prefix}}"
+  categories="{{arg:categories}}"
+  evidence="{{arg:evidence}}"
+  problem="{{arg:problem}}"
+  fix="{{arg:fix}}"
+  file_ref="{{arg:file_ref}}"
+  bad="{{arg:bad}}"
+  good="{{arg:good}}"
+  with_file={{arg:with_file}}
+  with_lines={{arg:with_lines}}
+  with_evidence={{arg:with_evidence}}
+  with_detail={{arg:with_detail}}
+  detail="{{arg:detail}}"
+  with_step_file={{arg:with_step_file}}
+  step="{{arg:step}}"
+}}
+{{ if=prefix_b }}
+
+{{
+  file="./agent/_templates/review-finding.txt"
+  prefix="{{arg:prefix_b}}"
+  categories="{{arg:categories_b}}"
+  evidence="{{arg:evidence_b}}"
+  problem="{{arg:problem_b}}"
+  fix="{{arg:fix_b}}"
+  file_ref="{{arg:file_ref_b}}"
+  bad="{{arg:bad_b}}"
+  good="{{arg:good_b}}"
+  with_file={{arg:with_file}}
+  with_lines={{arg:with_lines}}
+  with_evidence={{arg:with_evidence}}
+  with_detail={{arg:with_detail}}
+  detail="{{arg:detail_b}}"
+  with_step_file={{arg:with_step_file}}
+  step="{{arg:step_b}}"
+}}
+{{ endif }}
+{{ if=with_verified==1 }}
+
+## Verified
+- {{arg:verified_ref}}
+{{ else }}
+{{ if=mode==cached }}
+
+## Verified
+- {{arg:verified_ref}}
+{{ endif }}
+{{ endif }}
+
+## Notes
+- <optional short notes>
+```
+
+Return ONLY the fenced block.{{ if=with_verified==1 }} Always include `## Findings` and `## Verified`; write `- None` under empty sections.{{ else }}{{ if=mode==cached }} Always include `## Findings` and `## Verified`; write `- None` under empty sections.{{ endif }}{{ endif }}
+- Keep findings short and specific.
+- Include a unified diff after every finding's `Fix:` field with the exact text replacement.
+{{ if=return_rule_extra }}
+{{arg:return_rule_extra}}
+{{ endif }}

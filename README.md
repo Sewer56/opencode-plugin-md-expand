@@ -216,6 +216,20 @@ bun run format:check  # check formatting (CI enforces this)
 
 Editor setup: `.vscode/settings.json` enables format-on-save with oxc.
 
+### Benchmark prompt transforms
+
+The benchmark harness uses Tinybench and copied fixtures from a real OpenCode config:
+
+```sh
+bun run bench
+```
+
+It measures the actual `experimental.chat.system.transform` hook for simple imports, deep/complex imports, and no-op static markdown. Override run length when needed:
+
+```sh
+MD_EXPAND_BENCH_TIME_MS=5000 MD_EXPAND_BENCH_MIN_ITERATIONS=512 bun run bench
+```
+
 ## Package shape
 
 OpenCode npm plugin entrypoint is the default export:
