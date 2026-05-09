@@ -160,11 +160,6 @@ export async function expand(
   );
 }
 
-function recordDiagnostic(ctx: ExpandContext, diagnostic: ExpansionDiagnostic): void {
-  ctx.diagnostics?.push(diagnostic);
-  ctx.logger?.log(`diagnostic: ${diagnostic.kind} ${diagnostic.token} ${diagnostic.message}`);
-}
-
 /**
  * Remove lines that consist solely of empty-expansion markers.
  *
