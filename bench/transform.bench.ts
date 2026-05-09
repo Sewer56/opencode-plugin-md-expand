@@ -86,6 +86,7 @@ const BENCHMARK_CASES: BenchmarkCase[] = [
 const time = readPositiveIntegerEnv("MD_EXPAND_BENCH_TIME_MS", DEFAULT_TIME_MS);
 const iterations = readPositiveIntegerEnv("MD_EXPAND_BENCH_MIN_ITERATIONS", DEFAULT_ITERATIONS);
 const warmupTime = readPositiveIntegerEnv("MD_EXPAND_BENCH_WARMUP_TIME_MS", DEFAULT_WARMUP_TIME_MS);
+const cache = readBooleanEnv("MD_EXPAND_BENCH_CACHE", false);
 const warmupIterations = readPositiveIntegerEnv(
   "MD_EXPAND_BENCH_WARMUP_ITERATIONS",
   DEFAULT_WARMUP_ITERATIONS,
@@ -128,6 +129,7 @@ for (const benchmarkCase of BENCHMARK_CASES) {
 await bench.run();
 
 printResults(summarizeTasks(bench.tasks, caseMetadata), {
+  cache,
   iterations,
   time,
   warmupIterations,
@@ -147,6 +149,7 @@ async function createTransformHook(): Promise<TransformHook> {
     {
       configDirs: [FIXTURE_ROOT],
       debug: false,
+      cache,
       maxDepth: 10,
     },
   );
@@ -188,6 +191,22 @@ function readPositiveIntegerEnv(name: string, fallback: number): number {
     throw new Error(`${name} must be a positive integer, received ${JSON.stringify(raw)}`);
   }
   return parsed;
+}
+
+/**
+ * Read an environment variable and parse it as a boolean flag.
+ *
+ * @param name - Environment variable name.
+ * @param fallback - Default value when the variable is unset.
+ *
+ * @throws {Error} If the variable is set but is not `0`, `1`, `true`, or `false`.
+ */
+function readBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  if (raw === "1" || raw === "true") return true;
+  if (raw === "0" || raw === "false") return false;
+  throw new Error(`${name} must be boolean-like (0/1/true/false), received ${JSON.stringify(raw)}`);
 }
 
 /**
@@ -251,6 +270,7 @@ function percentile(samples: readonly number[] | undefined, percentileRank: numb
  *
  * @param results - Per-case benchmark statistics to display.
  * @param config - Benchmark timing configuration printed in the header.
+ *   - `cache`: whether expansion caching is enabled.
  *   - `iterations`: minimum loop iterations per task.
  *   - `time`: measurement window in milliseconds per task.
  *   - `warmupIterations`: iterations run before the timed window.
@@ -258,7 +278,13 @@ function percentile(samples: readonly number[] | undefined, percentileRank: numb
  */
 function printResults(
   results: BenchmarkResult[],
-  config: { iterations: number; time: number; warmupIterations: number; warmupTime: number },
+  config: {
+    cache: boolean;
+    iterations: number;
+    time: number;
+    warmupIterations: number;
+    warmupTime: number;
+  },
 ): void {
   console.log("opencode-plugin-md-expand transform benchmark");
   console.log(`fixtureRoot: ${FIXTURE_ROOT}`);
@@ -266,6 +292,7 @@ function printResults(
   console.log(`minIterations: ${config.iterations}`);
   console.log(`warmupTime: ${config.warmupTime} ms`);
   console.log(`warmupIterations: ${config.warmupIterations}`);
+  console.log(`cache: ${config.cache ? "on" : "off"}`);
   console.log("");
 
   const rows = results.map((result) => ({

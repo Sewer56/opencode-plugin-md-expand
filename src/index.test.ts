@@ -1,8 +1,10 @@
 import { describe, test, expect } from "bun:test";
+import fsp from "node:fs/promises";
 import path from "node:path";
 
 import { defaultConfigDirs } from "./config-discovery";
-import { resolveEffectiveConfigDirs } from "./index";
+import { MdExpandPlugin, resolveEffectiveConfigDirs } from "./index";
+import { cleanup, makeTmpDir } from "./test-helpers";
 
 describe("resolveEffectiveConfigDirs", () => {
   const projectDir = "/project";
@@ -58,3 +60,59 @@ describe("resolveEffectiveConfigDirs", () => {
     expect(withEmpty).toEqual(without);
   });
 });
+
+describe("MdExpandPlugin cache option", () => {
+  test("cache disabled by default sees file edits across transform calls", async () => {
+    const dir = await makeTmpDir({ "value.txt": "one" });
+    cleanup.push(dir);
+    const transform = await createSystemTransform(dir, {});
+
+    expect(await transformSystem(transform, `{{ file="./value.txt" }}`)).toBe("one");
+    await fsp.writeFile(path.join(dir, "value.txt"), "two", "utf8");
+    expect(await transformSystem(transform, `{{ file="./value.txt" }}`)).toBe("two");
+  });
+
+  test("cache enabled reuses resolved file text across transform calls", async () => {
+    const dir = await makeTmpDir({ "value.txt": "one" });
+    cleanup.push(dir);
+    const transform = await createSystemTransform(dir, { cache: true });
+
+    expect(await transformSystem(transform, `{{ file="./value.txt" }}`)).toBe("one");
+    await fsp.writeFile(path.join(dir, "value.txt"), "two", "utf8");
+    expect(await transformSystem(transform, `{{ file="./value.txt" }}`)).toBe("one");
+  });
+
+  test("cache keys include file-template args", async () => {
+    const dir = await makeTmpDir({ "tmpl.txt": "name={{arg:name}}" });
+    cleanup.push(dir);
+    const transform = await createSystemTransform(dir, { cache: true });
+
+    expect(await transformSystem(transform, `{{ file="./tmpl.txt" name=Alice }}`)).toBe(
+      "name=Alice",
+    );
+    expect(await transformSystem(transform, `{{ file="./tmpl.txt" name=Bob }}`)).toBe("name=Bob");
+  });
+});
+
+type SystemTransform = NonNullable<
+  Awaited<ReturnType<typeof MdExpandPlugin>>["experimental.chat.system.transform"]
+>;
+
+async function createSystemTransform(
+  dir: string,
+  options: Record<string, unknown>,
+): Promise<SystemTransform> {
+  const hooks = await MdExpandPlugin(
+    { directory: dir } as Parameters<typeof MdExpandPlugin>[0],
+    { configDirs: [dir], ...options } as Parameters<typeof MdExpandPlugin>[1],
+  );
+  const transform = hooks["experimental.chat.system.transform"];
+  if (!transform) throw new Error("missing system transform hook");
+  return transform;
+}
+
+async function transformSystem(transform: SystemTransform, text: string): Promise<string> {
+  const output = { system: [text] };
+  await transform({} as Parameters<SystemTransform>[0], output);
+  return output.system[0];
+}

@@ -36,12 +36,14 @@ program
     return n;
   })
   .option("--debug", "enable debug logging")
+  .option("--cache", "enable expansion caching")
   .option("--arg <key=value>", "initial args for expansion (repeatable)", collectArg, {})
   .action(async (inputFile, outputFile, opts) => {
     const exitCode = await executeRender(inputFile, outputFile, {
       configDir: opts.configDir,
       maxDepth: opts.maxDepth,
       debug: opts.debug,
+      cache: opts.cache,
       arg: opts.arg,
     });
     process.exitCode = exitCode;
@@ -61,12 +63,14 @@ program
     return n;
   })
   .option("--debug", "enable debug logging")
+  .option("--cache", "enable expansion caching")
   .option("--arg <key=value>", "initial args for expansion (repeatable)", collectArg, {})
   .action(async (paths, opts) => {
     const exitCode = await executeValidate(paths || [], {
       configDir: opts.configDir,
       maxDepth: opts.maxDepth,
       debug: opts.debug,
+      cache: opts.cache,
       arg: opts.arg,
     });
     process.exitCode = exitCode;

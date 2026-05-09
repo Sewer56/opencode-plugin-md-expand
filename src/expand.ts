@@ -30,8 +30,8 @@ export interface ExpansionDiagnostic {
 }
 
 /**
- * Shared execution context for a single expand() call tree.
- * Carries cycle detection state, read cache, and argument bindings through recursive expansion.
+ * Shared execution context for an expand() call tree.
+ * Carries cycle detection state, caches, and argument bindings through recursive expansion.
  */
 export interface ExpandContext {
   /** Resolved absolute paths of ancestor files in the current recursion chain. */
@@ -40,6 +40,8 @@ export interface ExpandContext {
   depth: number;
   /** Raw I/O cache keyed by resolved absolute path (content before recursive expansion). */
   readCache: Map<string, Promise<string>>;
+  /** Expanded file cache keyed by path, args, depth, and ancestor chain; may be shared by plugin calls. */
+  expandedFileCache?: Map<string, Promise<string>>;
   /** Caller-provided args scoped to this expansion level. */
   args: Map<string, string>;
   /** Optional diagnostics sink used by validation tooling. Runtime expansion stays silent. */
@@ -79,6 +81,7 @@ export async function expandWithDiagnostics(
     visited: new Set(),
     depth: 0,
     readCache: new Map(),
+    expandedFileCache: options?.cache ? new Map() : undefined,
     args: options?.initialArgs ?? EMPTY_ARGS,
     diagnostics,
     options,
@@ -110,6 +113,7 @@ export async function expand(
       visited: new Set(),
       depth: 0,
       readCache: new Map(),
+      expandedFileCache: options?.cache ? new Map() : undefined,
       args: options?.initialArgs ?? EMPTY_ARGS,
       options,
       logger,

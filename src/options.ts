@@ -15,6 +15,7 @@ import { MAX_DEPTH } from "./token-syntax";
  *                             (project root, cwd) cannot be expressed as static paths.
  * @property logDir          - Directory for debug logs. Resolved relative to the first configDir, or process.cwd().
  * @property initialArgs     - Key-value pairs to inject as `{{arg:*}}` variables. Accepts a plain object or a Map.
+ * @property cache           - Enable shared expansion caches. Disabled by default so config edits are visible immediately.
  */
 export interface MdExpandOptions {
   maxDepth?: number;
@@ -23,6 +24,7 @@ export interface MdExpandOptions {
   extraConfigDirs?: string[];
   logDir?: string;
   initialArgs?: Record<string, string> | Map<string, string>;
+  cache?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export interface ResolvedMdExpandOptions {
   extraConfigDirs: string[];
   logDir: string;
   initialArgs: Map<string, string>;
+  cache: boolean;
 }
 
 /**
@@ -47,6 +50,8 @@ export interface ResolvedMdExpandOptions {
  * floored to an integer; negative or non-finite values fall back to `MAX_DEPTH`.
  * Debug mode is active when `debug: true` is set or the env var
  * `OPENCODE_PLUGIN_MD_EXPAND_DEBUG` is set to `"1"`.
+ * Expansion caching is active when `cache: true` is set or the env var
+ * `OPENCODE_PLUGIN_MD_EXPAND_CACHE` is set to `"1"`.
  *
  * @param options  - User-supplied partial options.
  * @param defaults - Default options to apply before user options (merged first).
@@ -62,6 +67,7 @@ export function resolveMdExpandOptions(
     : [];
   const maxDepth = isValidMaxDepth(merged.maxDepth) ? Math.floor(merged.maxDepth) : MAX_DEPTH;
   const debug = merged.debug === true || isDebugEnv();
+  const cache = merged.cache === true || isCacheEnv();
   const logDir = resolveLogDir(merged.logDir, configDirs);
 
   return {
@@ -71,6 +77,7 @@ export function resolveMdExpandOptions(
     extraConfigDirs,
     logDir,
     initialArgs: normalizeArgs(merged.initialArgs),
+    cache,
   };
 }
 
@@ -82,6 +89,11 @@ function isValidMaxDepth(value: unknown): value is number {
 /** True when the debug env var `OPENCODE_PLUGIN_MD_EXPAND_DEBUG` is set to `"1"`. */
 function isDebugEnv(): boolean {
   return process.env.OPENCODE_PLUGIN_MD_EXPAND_DEBUG === "1";
+}
+
+/** True when the cache env var `OPENCODE_PLUGIN_MD_EXPAND_CACHE` is set to `"1"`. */
+function isCacheEnv(): boolean {
+  return process.env.OPENCODE_PLUGIN_MD_EXPAND_CACHE === "1";
 }
 
 /** Resolve log directory: explicit path > first configDir/plugins/.logs > cwd/.logs. */

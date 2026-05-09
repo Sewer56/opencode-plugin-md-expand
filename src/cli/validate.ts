@@ -11,6 +11,7 @@ export interface ValidateOptions {
   configDir?: string;
   maxDepth?: number;
   debug?: boolean;
+  cache?: boolean;
   arg?: Record<string, string>;
 }
 
@@ -37,6 +38,7 @@ export async function executeValidate(
     configDirs: options.configDir ? [options.configDir] : [],
     maxDepth: options.maxDepth,
     debug: options.debug,
+    cache: options.cache,
     initialArgs: options.arg,
   };
   const resolved = resolveMdExpandOptions(mdOptions);

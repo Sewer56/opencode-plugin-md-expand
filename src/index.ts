@@ -12,6 +12,7 @@ import type { Plugin, PluginOptions } from "@opencode-ai/plugin";
 import { defaultConfigDirs } from "./config-discovery";
 import { createDebugLogger } from "./debug";
 import { expand, hasExpandableToken } from "./expand";
+import type { ExpandContext } from "./expand";
 import type { MdExpandOptions } from "./options";
 import { resolveMdExpandOptions } from "./options";
 
@@ -81,9 +82,26 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
     configDirs: resolveEffectiveConfigDirs(resolved, input.directory),
   };
   const logger = effectiveOptions.debug ? createDebugLogger(effectiveOptions) : undefined;
+  const sharedReadCache = effectiveOptions.cache ? new Map<string, Promise<string>>() : undefined;
+  const sharedExpandedFileCache = effectiveOptions.cache
+    ? new Map<string, Promise<string>>()
+    : undefined;
   logger?.log(
-    `init: projectDir=${input.directory} configDirs=${JSON.stringify(effectiveOptions.configDirs)}`,
+    `init: projectDir=${input.directory} configDirs=${JSON.stringify(effectiveOptions.configDirs)} cache=${effectiveOptions.cache}`,
   );
+
+  const createContext = (): ExpandContext | undefined => {
+    if (!effectiveOptions.cache) return undefined;
+    return {
+      visited: new Set(),
+      depth: 0,
+      readCache: sharedReadCache!,
+      expandedFileCache: sharedExpandedFileCache,
+      args: effectiveOptions.initialArgs,
+      options: effectiveOptions,
+      logger,
+    };
+  };
 
   return {
     "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
@@ -92,7 +110,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
         const entry = output.system[i];
         if (!hasExpandableToken(entry)) continue;
         logger?.log(`system[${i}]: expanding tokens (${entry.length} chars)`);
-        output.system[i] = await expand(entry, input.directory, effectiveOptions);
+        output.system[i] = await expand(entry, input.directory, effectiveOptions, createContext());
       }
     },
     "experimental.chat.messages.transform": async (
@@ -107,7 +125,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
           if (part.type !== "text" || !part.text) continue;
           if (!hasExpandableToken(part.text)) continue;
           logger?.log(`user-message-part[${i}]: expanding tokens (${part.text.length} chars)`);
-          part.text = await expand(part.text, input.directory, effectiveOptions);
+          part.text = await expand(part.text, input.directory, effectiveOptions, createContext());
         }
       }
     },

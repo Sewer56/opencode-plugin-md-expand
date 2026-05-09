@@ -520,6 +520,18 @@ describe("expand: recursive file templates", () => {
     const result = await expand(`{{ file="./top.txt" }}`, dir, opts());
     expect(result).toBe("A_CONTENT | B:S:A_CONTENT");
   });
+
+  test("expanded-file cache keeps ancestor chains independent", async () => {
+    const dir = await makeTmpDir({
+      "shared.txt": `S:{{ file="./ref-a.txt" }}`,
+      "ref-a.txt": "A_CONTENT",
+      "ref-b.txt": `B:{{ file="./shared.txt" }}`,
+      "top.txt": `{{ file="./ref-a.txt" }} | {{ file="./ref-b.txt" }}`,
+    });
+    cleanup.push(dir);
+    const result = await expand(`{{ file="./top.txt" }}`, dir, opts({ cache: true }));
+    expect(result).toBe("A_CONTENT | B:S:A_CONTENT");
+  });
 });
 
 describe("expand: include boundary whitespace", () => {

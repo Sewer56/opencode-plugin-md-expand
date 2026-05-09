@@ -68,6 +68,7 @@ No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the
 | `debug`           | `boolean`                | env-based                                                      | Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                                   |
 | `logDir`          | `string`                 | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                                                                                                     |
 | `initialArgs`     | `Record<string, string>` | `{}`                                                           | Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                                               |
+| `cache`           | `boolean`                | `false`                                                        | Cache raw and recursively-expanded file content across plugin transform calls. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_CACHE=1`; leave off while editing config files.                |
 
 ## Template grammar
 

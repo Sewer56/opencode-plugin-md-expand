@@ -34,6 +34,18 @@ interface PendingEnvToken {
   varName: string;
 }
 
+/** Cached value for one env variable within a scalar expansion pass. */
+interface EnvExpansionValue {
+  /** Raw process.env value, or empty string when unset. */
+  rawValue: string;
+  /** Replacement text, including the empty-expansion marker when raw value is empty. */
+  value: string;
+  /** Whether the raw value contains a file template. */
+  hasFileTemplate: boolean;
+  /** Whether the raw value contains an inline conditional template. */
+  hasInlineConditionalTemplate: boolean;
+}
+
 /**
  * Result of combined arg/env scalar token expansion.
  *
@@ -155,6 +167,9 @@ export function expandScalarTokens(
       // Record env token with offsets mapped into the post-arg-expansion output,
       // since arg expansion may have shifted positions relative to the source text.
       pendingEnv ??= [];
+      // Translate original-text offsets to the post-arg-expansion output.
+      // `out.length` is the current output size; `start - cursor` is the token's
+      // offset from the last-consumed position in the original text.
       pendingEnv.push({
         start: out.length + start - cursor,
         end: out.length + end + TOKEN_END.length - cursor,
@@ -186,6 +201,9 @@ export function expandScalarTokens(
   }
 
   const fileArgRanges = collectFileArgRanges(argText, argProtectedRanges);
+  // Shared env-value cache so both the fast-path and fallback loops avoid
+  // redundant process.env reads and template-detection scans.
+  const envCache = new Map<string, EnvExpansionValue>();
 
   // Fallback: malformed token invalidated pending-env offsets; rescan from scratch.
   if (needsEnvScan) {
@@ -196,6 +214,7 @@ export function expandScalarTokens(
       hasFile,
       hasInline,
       logger,
+      envCache,
     );
   }
 
@@ -213,15 +232,15 @@ export function expandScalarTokens(
     skipIndex = advanceRangeIndex(skipRanges, skipIndex, token.start);
     if (isInRange(skipRanges, skipIndex, token.start)) continue;
 
-    const rawValue = process.env[token.varName] ?? "";
-    const value = rawValue.length ? rawValue : EMPTY_EXPANSION_MARKER;
+    const envValue = getEnvExpansionValue(token.varName, envCache);
+    const { rawValue, value } = envValue;
     logger?.log(`env: ${token.varName} → ${rawValue ? "<set>" : "<unset>"}`);
 
     // Check expanded env values for nested file/conditional templates so the
     // caller knows whether to run subsequent expansion passes.
     if (rawValue.length) {
-      if (!hasFile && hasFileTemplate(rawValue)) hasFile = true;
-      if (!hasInline && hasInlineConditionalTemplate(rawValue)) hasInline = true;
+      if (!hasFile && envValue.hasFileTemplate) hasFile = true;
+      if (!hasInline && envValue.hasInlineConditionalTemplate) hasInline = true;
     }
 
     out += argText.slice(cursor, token.start) + value;
@@ -257,6 +276,8 @@ export function expandScalarTokens(
  * Used when the fast path (deferred pending-env tokens) is invalid because a
  * malformed token appeared before valid env tokens, requiring a full scan of
  * the arg-expanded text while skipping protected and file-arg ranges.
+ *
+ * @param envCache - Shared per-pass cache for env variable lookups and template detection.
  */
 function expandEnvTokensInText(
   text: string,
@@ -265,6 +286,7 @@ function expandEnvTokensInText(
   hasFile: boolean,
   hasInline: boolean,
   logger: ReturnType<typeof createDebugLogger> | undefined,
+  envCache: Map<string, EnvExpansionValue>,
 ): ScalarExpandResult {
   const skipRanges = mergeRanges(protectedRanges, fileArgRanges);
   const replacements: ReplacementRange[] = [];
@@ -295,15 +317,15 @@ function expandEnvTokensInText(
     }
 
     const varName = text.slice(valueStart, end);
-    const rawValue = process.env[varName] ?? "";
-    const value = rawValue.length ? rawValue : EMPTY_EXPANSION_MARKER;
+    const envValue = getEnvExpansionValue(varName, envCache);
+    const { rawValue, value } = envValue;
     logger?.log(`env: ${varName} → ${rawValue ? "<set>" : "<unset>"}`);
 
     // Check expanded env values for nested file/conditional templates so the
     // caller knows whether to run subsequent expansion passes.
     if (rawValue.length) {
-      if (!hasFile && hasFileTemplate(rawValue)) hasFile = true;
-      if (!hasInline && hasInlineConditionalTemplate(rawValue)) hasInline = true;
+      if (!hasFile && envValue.hasFileTemplate) hasFile = true;
+      if (!hasInline && envValue.hasInlineConditionalTemplate) hasInline = true;
     }
 
     out += text.slice(cursor, start) + value;
@@ -335,6 +357,36 @@ function expandEnvTokensInText(
 }
 
 /**
+ * Look up an env variable's expansion value, caching the result so repeated
+ * occurrences of the same `{{env:VAR}}` avoid redundant `process.env` reads
+ * and template-detection scans.
+ *
+ * @param varName - Environment variable name (the text between `{{env:` and `}}`).
+ * @param cache - Per-pass cache that survives across both the fast-path and
+ *   fallback env expansion loops.
+ * @returns The resolved env value with pre-computed template-detection flags.
+ */
+function getEnvExpansionValue(
+  varName: string,
+  cache: Map<string, EnvExpansionValue>,
+): EnvExpansionValue {
+  const cached = cache.get(varName);
+  if (cached) return cached;
+
+  const rawValue = process.env[varName] ?? "";
+  const value = rawValue.length ? rawValue : EMPTY_EXPANSION_MARKER;
+  const envValue: EnvExpansionValue = {
+    rawValue,
+    value,
+    hasFileTemplate: rawValue.length ? hasFileTemplate(rawValue) : false,
+    hasInlineConditionalTemplate: rawValue.length ? hasInlineConditionalTemplate(rawValue) : false,
+  };
+
+  cache.set(varName, envValue);
+  return envValue;
+}
+
+/**
  * Adjust protected/file-arg range offsets after text replacements shift positions.
  *
  * Walks sorted ranges alongside sorted replacements, accumulating a running
@@ -349,6 +401,8 @@ function remapRanges(ranges: ProtectedRange[], replacements: ReplacementRange[])
   let replacementIndex = 0;
   let delta = 0;
   for (const range of ranges) {
+    // Accumulate delta from every replacement that ends at or before this range
+    // starts, so the range's shift reflects only replacements that fully precede it.
     while (
       replacementIndex < replacements.length &&
       replacements[replacementIndex].end <= range.start

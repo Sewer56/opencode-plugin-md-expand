@@ -9,7 +9,7 @@ import { advanceRangeIndex, isInRange, type ProtectedRange } from "../ranges";
 import { shouldExpandForCondition } from "../template/conditions";
 import { hasExpandableToken } from "../template/detection";
 import { parseFileTemplate } from "../template/file-parser";
-import { FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "../token-syntax";
+import { FILE_TEMPLATE_START, EMPTY_EXPANSION_MARKER, MAX_DEPTH } from "../token-syntax";
 
 /**
  * Expand `{{ file="path" }}` templates.
@@ -99,9 +99,7 @@ export async function expandFileTokens(
       ctx.readCache.set(resolved, rawPromise);
     }
 
-    const read = rawPromise.then((raw) =>
-      recursivelyExpand(raw, resolved, baseDir, token, ctx, args, options),
-    );
+    const read = readExpandedFile(rawPromise, resolved, baseDir, token, ctx, args, options);
 
     parts.push(text.slice(cursor, start));
     reads.push(read);
@@ -129,6 +127,38 @@ export async function expandFileTokens(
     out += parts[i] + stripTrailingNewline(contents[i]);
   }
   return out + tail;
+}
+
+/**
+ * Read and recursively expand a file, optionally reusing a shared expanded-text cache.
+ */
+function readExpandedFile(
+  rawPromise: Promise<string>,
+  resolved: string,
+  baseDir: string,
+  token: string,
+  ctx: ExpandContext,
+  args: Map<string, string>,
+  options?: ResolvedMdExpandOptions,
+): Promise<string> {
+  const cache = ctx.expandedFileCache;
+  if (!cache)
+    return rawPromise.then((raw) =>
+      recursivelyExpand(raw, resolved, baseDir, token, ctx, args, options),
+    );
+
+  const key = makeExpandedFileCacheKey(resolved, baseDir, ctx, args, options);
+  const cached = cache.get(key);
+  if (cached) return cached;
+
+  const read = rawPromise
+    .then((raw) => recursivelyExpand(raw, resolved, baseDir, token, ctx, args, options))
+    .catch((err: unknown) => {
+      cache.delete(key);
+      throw err;
+    });
+  cache.set(key, read);
+  return read;
 }
 
 /**
@@ -266,6 +296,7 @@ async function recursivelyExpand(
     visited: childVisited,
     depth: ctx.depth + 1,
     readCache: ctx.readCache,
+    expandedFileCache: ctx.expandedFileCache,
     args,
     diagnostics: ctx.diagnostics,
     options: ctx.options ?? options,
@@ -275,4 +306,38 @@ async function recursivelyExpand(
     `file: ${token} → ${resolved} recursive expansion (${expanded.length} chars, depth ${ctx.depth + 1})`,
   );
   return expanded;
+}
+
+function makeExpandedFileCacheKey(
+  resolved: string,
+  baseDir: string,
+  ctx: ExpandContext,
+  args: Map<string, string>,
+  options?: ResolvedMdExpandOptions,
+): string {
+  const maxDepth = options?.maxDepth ?? ctx.options?.maxDepth ?? MAX_DEPTH;
+  return JSON.stringify({
+    resolved,
+    baseDir,
+    depth: ctx.depth + 1,
+    maxDepth,
+    args: sortedMapEntries(args),
+    visited: sortedSetValues(ctx.visited),
+  });
+}
+
+function sortedMapEntries(map: Map<string, string>): [string, string][] {
+  if (!map.size) return [];
+  return [...map.entries()].sort(([left], [right]) => compareStrings(left, right));
+}
+
+function sortedSetValues(set: Set<string>): string[] {
+  if (!set.size) return [];
+  return [...set].sort(compareStrings);
+}
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }

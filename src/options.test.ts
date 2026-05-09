@@ -12,6 +12,7 @@ describe("resolveMdExpandOptions", () => {
     expect(o.debug).toBe(false);
     expect(o.configDirs).toEqual([]);
     expect(o.extraConfigDirs).toEqual([]);
+    expect(o.cache).toBe(false);
     expect(o.initialArgs).toBeInstanceOf(Map);
   });
 
@@ -19,11 +20,13 @@ describe("resolveMdExpandOptions", () => {
     const o = resolveMdExpandOptions({
       maxDepth: 3,
       debug: true,
+      cache: true,
       configDirs: ["/foo"],
       initialArgs: { x: "1" },
     });
     expect(o.maxDepth).toBe(3);
     expect(o.debug).toBe(true);
+    expect(o.cache).toBe(true);
     expect(o.configDirs).toEqual([path.resolve("/foo")]);
     expect(o.initialArgs.get("x")).toBe("1");
   });
@@ -32,6 +35,15 @@ describe("resolveMdExpandOptions", () => {
     const restore = withEnv("OPENCODE_PLUGIN_MD_EXPAND_DEBUG", "1");
     try {
       expect(resolveMdExpandOptions().debug).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("enables cache via env var", () => {
+    const restore = withEnv("OPENCODE_PLUGIN_MD_EXPAND_CACHE", "1");
+    try {
+      expect(resolveMdExpandOptions().cache).toBe(true);
     } finally {
       restore();
     }
