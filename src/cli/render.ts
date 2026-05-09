@@ -5,7 +5,6 @@ import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
 import { expand } from "../expand";
 import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
-import { parseCommonArgs, resolveInputPath, lineColumn, type CliDefaults } from "./shared";
 
 export interface RenderOptions {
   inputFile: string;
@@ -16,30 +15,9 @@ export interface RenderOptions {
   arg?: Record<string, string>;
 }
 
-export async function runRenderCommand(args: string[], defaults?: CliDefaults): Promise<number> {
-  if (args.includes("--help") || args.includes("-h")) {
-    printRenderHelp(defaults?.programName ?? "opencode-plugin-md-expand render");
-    return args.length === 0 ? 1 : 0;
-  }
-
-  const parsed = parseCommonArgs(args, defaults);
-  const { configDir, options: rawOptions, positional } = parsed;
-
-  if (positional.length === 0) {
-    console.error("render: no input file specified");
-    return 1;
-  }
-
-  return executeRender(positional[0], positional[1], {
-    configDir,
-    maxDepth: rawOptions.maxDepth,
-    debug: rawOptions.debug,
-    arg: rawOptions.initialArgs
-      ? rawOptions.initialArgs instanceof Map
-        ? Object.fromEntries(rawOptions.initialArgs)
-        : rawOptions.initialArgs
-      : {},
-  });
+function resolveInputPath(input: string, configDir: string): string {
+  if (path.isAbsolute(input)) return input;
+  return path.resolve(configDir, input);
 }
 
 export async function executeRender(
@@ -88,25 +66,3 @@ export async function executeRender(
   }
   return 0;
 }
-
-export function printRenderHelp(program?: string): void {
-  const p = program ?? "opencode-plugin-md-expand render";
-  console.log(`${p}: Expand a template file
-
-Usage:
-  ${p} [options] <input-file> [output-file]
-
-Options:
-  --config-dir <path>   Config directory for relative includes (default: auto-discover)
-  --max-depth <n>       Maximum recursive file include depth (default: 10)
-  --debug               Write debug log
-  --arg key=value       Initial arg for top-level expansion; repeatable
-  --help, -h            Show this help
-
-If output-file is omitted, result is written to stdout.
-`);
-}
-
-// Re-export for backwards compatibility
-export { parseCommonArgs, resolveInputPath, lineColumn };
-export type { CliDefaults };

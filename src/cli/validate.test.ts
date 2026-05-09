@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test";
 import path from "node:path";
 
 import { makeTmpDir, cleanup } from "../test-helpers";
-import { executeValidate, runValidateCommand, collectTemplateFiles } from "./validate";
+import { executeValidate, collectTemplateFiles } from "./validate";
 
 describe("collectTemplateFiles", () => {
   test("collects .md files", async () => {
@@ -112,59 +112,5 @@ describe("executeValidate", () => {
     });
 
     expect(exitCode).toBe(0);
-  });
-});
-
-describe("runValidateCommand", () => {
-  test("parses --config-dir option", async () => {
-    const dir = await makeTmpDir({
-      "test.md": "Test",
-    });
-    cleanup.push(dir);
-
-    const exitCode = await runValidateCommand(["--config-dir", dir]);
-    expect(exitCode).toBe(0);
-  });
-
-  test("parses --max-depth option", async () => {
-    const dir = await makeTmpDir({
-      "test.md": "Test",
-    });
-    cleanup.push(dir);
-
-    const exitCode = await runValidateCommand([path.join(dir, "test.md"), "--max-depth", "3"]);
-    expect(exitCode).toBe(0);
-  });
-
-  test("parses multiple --arg options", async () => {
-    const dir = await makeTmpDir({
-      "test.md": "A={{arg:a}} B={{arg:b}}",
-    });
-    cleanup.push(dir);
-
-    const exitCode = await runValidateCommand([
-      path.join(dir, "test.md"),
-      "--arg",
-      "a=1",
-      "--arg",
-      "b=2",
-    ]);
-
-    expect(exitCode).toBe(0);
-  });
-
-  test("shows help on --help", async () => {
-    let output = "";
-    const origLog = console.log;
-    console.log = (...args: unknown[]) => {
-      output += args.join(" ") + "\n";
-    };
-
-    const exitCode = await runValidateCommand(["--help"]);
-
-    console.log = origLog;
-
-    expect(exitCode).toBe(0);
-    expect(output).toContain("Validate template files");
   });
 });

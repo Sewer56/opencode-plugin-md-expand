@@ -5,7 +5,6 @@ import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
 import { expandWithDiagnostics, hasExpandableToken } from "../expand";
 import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
-import { parseCommonArgs, resolveInputPath, lineColumn, type CliDefaults } from "./shared";
 
 export interface ValidateOptions {
   paths?: string[];
@@ -15,25 +14,17 @@ export interface ValidateOptions {
   arg?: Record<string, string>;
 }
 
-export async function runValidateCommand(args: string[], defaults?: CliDefaults): Promise<number> {
-  if (args.includes("--help") || args.includes("-h")) {
-    printValidateHelp(defaults?.programName ?? "opencode-plugin-md-expand validate");
-    return 0;
+function lineColumn(text: string, index: number): { line: number; column: number } {
+  let line = 1;
+  let lineStart = 0;
+  for (let i = 0; i < index; i++) {
+    const code = text.charCodeAt(i);
+    if (code !== 10 && code !== 13) continue;
+    if (code === 13 && text.charCodeAt(i + 1) === 10) i++;
+    line++;
+    lineStart = i + 1;
   }
-
-  const parsed = parseCommonArgs(args, defaults);
-  const { configDir, options: rawOptions, positional } = parsed;
-
-  return executeValidate(positional, {
-    configDir,
-    maxDepth: rawOptions.maxDepth,
-    debug: rawOptions.debug,
-    arg: rawOptions.initialArgs
-      ? rawOptions.initialArgs instanceof Map
-        ? Object.fromEntries(rawOptions.initialArgs)
-        : rawOptions.initialArgs
-      : {},
-  });
+  return { line, column: index - lineStart + 1 };
 }
 
 export async function executeValidate(
@@ -113,24 +104,6 @@ export async function executeValidate(
   }
 }
 
-export function printValidateHelp(program?: string): void {
-  const p = program ?? "opencode-plugin-md-expand validate";
-  console.log(`${p}: Validate template files
-
-Usage:
-  ${p} [options] [paths...]
-
-Options:
-  --config-dir <path>   Config directory for relative includes (default: auto-discover)
-  --max-depth <n>       Maximum recursive file include depth (default: 10)
-  --debug               Write debug log
-  --arg key=value       Initial arg for top-level expansion; repeatable
-  --help, -h            Show this help
-
-If no paths are given, the config directory is scanned for template files.
-`);
-}
-
 export function collectTemplateFiles(paths: string[]): string[] {
   const files: string[] = [];
   for (const p of paths) {
@@ -156,11 +129,6 @@ export function collectTemplateFilesFrom(dirOrFile: string, into: string[]): voi
 export function isTemplateFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
   return ext === ".md" || ext === ".txt" || ext === ".mdc" || ext === ".opencode";
-}
-
-interface TemplateFile {
-  path: string;
-  content: string;
 }
 
 interface LocatedDiagnostic {
@@ -256,7 +224,3 @@ function locateRemaining(
     message: "unclosed or malformed token",
   };
 }
-
-// Re-export for backwards compatibility
-export { parseCommonArgs, resolveInputPath, lineColumn };
-export type { CliDefaults };
