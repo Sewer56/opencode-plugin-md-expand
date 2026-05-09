@@ -19,7 +19,7 @@ export function expandEnvTokens(
   protectedRanges: ProtectedRange[],
   options?: ResolvedMdExpandOptions,
 ): SyncExpandResult {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
   const fileArgRanges = collectFileArgRanges(text, protectedRanges);
   const skipRanges = mergeRanges(protectedRanges, fileArgRanges);
   let skipIndex = 0;

@@ -58,6 +58,15 @@ describe("expand: no tokens", () => {
     const result = await expand(`broken {{env:FOO and {{ file="./x.txt"`, "/tmp", opts());
     expect(result).toBe(`broken {{env:FOO and {{ file="./x.txt"`);
   });
+
+  test("unclosed env does not block later arg expansion", async () => {
+    const result = await expand(
+      "broken {{env:FOO and {{arg:name}}",
+      "/tmp",
+      opts({ initialArgs: { name: "ARG_OK" } }),
+    );
+    expect(result).toBe("broken {{env:FOO and ARG_OK");
+  });
 });
 
 describe("expand: repeated-call safety", () => {

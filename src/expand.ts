@@ -2,22 +2,16 @@ import { createDebugLogger } from "./debug";
 import type { DebugLogger } from "./debug";
 import type { ResolvedMdExpandOptions } from "./options";
 import { mergeRanges } from "./ranges";
-import { hasExpandableToken } from "./template/detection";
-import { collectFileArgRanges } from "./template/file-parser";
 import {
-  MAX_DEPTH,
-  TOKEN_START,
-  ARG_PREFIX,
-  ENV_PREFIX,
-  FILE_TEMPLATE_START,
-  EMPTY_ARGS,
-  EMPTY_EXPANSION_MARKER,
-  EMPTY_RANGES,
-} from "./token-syntax";
-import { expandArgTokens } from "./tokens/arg";
+  hasExpandableToken,
+  hasFileTemplate,
+  hasInlineConditionalTemplate,
+} from "./template/detection";
+import { collectFileArgRanges } from "./template/file-parser";
+import { MAX_DEPTH, FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "./token-syntax";
 import { expandInlineConditionals } from "./tokens/conditional";
-import { expandEnvTokens } from "./tokens/env";
 import { expandFileTokens } from "./tokens/file";
+import { expandScalarTokens } from "./tokens/scalar";
 
 /**
  * Diagnostic record for a single expansion issue encountered during template processing.
@@ -97,10 +91,10 @@ export async function expandWithDiagnostics(
  * Expand {{arg:key}}, {{env:VAR}}, inline `{{ if=... }}` blocks, and
  * `{{ file="path" }}` templates in `text`.
  *
- * Arg substitution runs first (synchronous), then environment substitution
- * (synchronous), then inline conditional substitution (synchronous), then file
- * substitution (async reads). File content is recursively expanded if it contains
- * further templates, up to MAX_DEPTH levels deep.
+ * Arg/env substitution is fused into one scanner while preserving arg-first,
+ * env-second semantics. Inline conditional substitution then runs synchronously,
+ * followed by file substitution (async reads). File content is recursively
+ * expanded if it contains further templates, up to MAX_DEPTH levels deep.
  */
 export async function expand(
   text: string,
@@ -108,7 +102,7 @@ export async function expand(
   options?: ResolvedMdExpandOptions,
   ctx?: ExpandContext,
 ): Promise<string> {
-  if (text.indexOf(TOKEN_START) === -1) return text;
+  if (text.indexOf(FILE_TEMPLATE_START) === -1) return text;
 
   if (!ctx) {
     const logger = options?.debug ? createDebugLogger(options) : undefined;
@@ -122,35 +116,30 @@ export async function expand(
     };
   }
 
-  const hasArg = text.includes(ARG_PREFIX);
-  const hasEnv = text.includes(ENV_PREFIX);
-  const hasTemplate = text.includes(FILE_TEMPLATE_START);
-  let hasFile = hasTemplate;
-  if (!hasArg && !hasEnv && !hasTemplate) return text;
+  const scalarInput = text;
+  const scalarResult = expandScalarTokens(text, ctx.args, options);
+  text = scalarResult.text;
+  const protectedRanges = scalarResult.protectedRanges;
+  let fileArgRanges = scalarResult.fileArgRanges;
+  let hasFile = scalarResult.hasFileTemplate;
+  let hasInline = scalarResult.hasInlineConditionalTemplate;
 
-  let protectedRanges = EMPTY_RANGES;
+  if (text.indexOf(FILE_TEMPLATE_START) === -1) return stripEmptyExpansionMarkers(text);
 
-  if (hasArg) {
-    const argResult = expandArgTokens(text, ctx.args, options);
-    text = argResult.text;
-    protectedRanges = argResult.protectedRanges;
+  if (text !== scalarInput) {
+    if (!hasInline) hasInline = hasInlineConditionalTemplate(text);
+    if (!hasFile) hasFile = hasFileTemplate(text);
   }
 
-  if (hasEnv) {
-    const envResult = expandEnvTokens(text, protectedRanges, options);
-    text = envResult.text;
-    protectedRanges = envResult.protectedRanges;
-  }
-
-  if (hasTemplate) {
-    const inlineProtectedRanges = mergeRanges(
-      protectedRanges,
-      collectFileArgRanges(text, protectedRanges),
-    );
+  if (hasInline) {
+    if (!scalarResult.fileArgRangesCollected) {
+      fileArgRanges = collectFileArgRanges(text, protectedRanges);
+    }
+    const inlineProtectedRanges = mergeRanges(protectedRanges, fileArgRanges);
     text = expandInlineConditionals(text, ctx, inlineProtectedRanges, options);
+    hasFile = hasFileTemplate(text);
   }
 
-  if (!hasFile) hasFile = text.includes(FILE_TEMPLATE_START);
   if (!hasFile) return stripEmptyExpansionMarkers(text);
   // Depth gate: at maxDepth, leave file templates as literal text.
   const maxDepth = options?.maxDepth ?? MAX_DEPTH;

@@ -27,7 +27,7 @@ function expandInlineConditionalsInRange(
   protectedRanges: ProtectedRange[],
   options?: ResolvedMdExpandOptions,
 ): string {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
   let out = "";
   let cursor = rangeStart;
   let searchFrom = rangeStart;

@@ -273,12 +273,12 @@ function printResults(
     in: String(result.inputBytes),
     out: String(result.outputBytes),
     n: String(result.samples),
-    min: formatMs(result.min),
-    p50: formatMs(result.p50),
-    mean: formatMs(result.mean),
-    p95: formatMs(result.p95),
-    p99: formatMs(result.p99),
-    max: formatMs(result.max),
+    min: formatMicroseconds(result.min),
+    p50: formatMicroseconds(result.p50),
+    mean: formatMicroseconds(result.mean),
+    p95: formatMicroseconds(result.p95),
+    p99: formatMicroseconds(result.p99),
+    max: formatMicroseconds(result.max),
   }));
 
   const headers = {
@@ -286,12 +286,12 @@ function printResults(
     in: "in bytes",
     out: "out bytes",
     n: "samples",
-    min: "min ms",
-    p50: "p50 ms",
-    mean: "mean ms",
-    p95: "p95 ms",
-    p99: "p99 ms",
-    max: "max ms",
+    min: "min µs",
+    p50: "p50 µs",
+    mean: "mean µs",
+    p95: "p95 µs",
+    p99: "p99 µs",
+    max: "max µs",
   };
   const columns = Object.keys(headers) as Array<keyof typeof headers>;
   const widths = Object.fromEntries(
@@ -318,6 +318,6 @@ function formatRow(
   return columns.map((column) => row[column].padEnd(widths[column])).join("  ");
 }
 
-function formatMs(value: number): string {
-  return value.toFixed(3);
+function formatMicroseconds(valueMs: number): string {
+  return (valueMs * 1_000).toFixed(3);
 }

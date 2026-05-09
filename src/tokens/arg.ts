@@ -11,7 +11,7 @@ export function expandArgTokens(
   args: Map<string, string>,
   options?: ResolvedMdExpandOptions,
 ): SyncExpandResult {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
   let out = "";
   let cursor = 0;
   let searchFrom = 0;

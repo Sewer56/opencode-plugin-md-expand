@@ -68,6 +68,17 @@ describe("expand: file templates", () => {
     expect(result).toBe("TIGHT");
   });
 
+  test("arg expansion can form the file attribute name", async () => {
+    const dir = await makeTmpDir({ "marker.txt": "ATTR_FROM_ARG" });
+    cleanup.push(dir);
+    const result = await expand(
+      `{{ {{arg:attr}}="./marker.txt" }}`,
+      dir,
+      opts({ initialArgs: { attr: "file" } }),
+    );
+    expect(result).toBe("ATTR_FROM_ARG");
+  });
+
   test("removes full line when file template expands empty", async () => {
     const dir = await makeTmpDir({});
     cleanup.push(dir);

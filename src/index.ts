@@ -80,8 +80,8 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
     ...resolved,
     configDirs: resolveEffectiveConfigDirs(resolved, input.directory),
   };
-  const logger = createDebugLogger(effectiveOptions);
-  logger.log(
+  const logger = effectiveOptions.debug ? createDebugLogger(effectiveOptions) : undefined;
+  logger?.log(
     `init: projectDir=${input.directory} configDirs=${JSON.stringify(effectiveOptions.configDirs)}`,
   );
 
@@ -91,7 +91,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
       for (let i = 0; i < output.system.length; i++) {
         const entry = output.system[i];
         if (!hasExpandableToken(entry)) continue;
-        logger.log(`system[${i}]: expanding tokens (${entry.length} chars)`);
+        logger?.log(`system[${i}]: expanding tokens (${entry.length} chars)`);
         output.system[i] = await expand(entry, input.directory, effectiveOptions);
       }
     },
@@ -106,7 +106,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
           const part = msg.parts[i];
           if (part.type !== "text" || !part.text) continue;
           if (!hasExpandableToken(part.text)) continue;
-          logger.log(`user-message-part[${i}]: expanding tokens (${part.text.length} chars)`);
+          logger?.log(`user-message-part[${i}]: expanding tokens (${part.text.length} chars)`);
           part.text = await expand(part.text, input.directory, effectiveOptions);
         }
       }

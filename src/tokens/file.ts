@@ -21,7 +21,7 @@ export async function expandFileTokens(
   protectedRanges: ProtectedRange[],
   options?: ResolvedMdExpandOptions,
 ): Promise<string> {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
   const parts: string[] = [];
   const reads: Promise<string>[] = [];
 
@@ -141,7 +141,7 @@ async function readRawFile(
   ctx: ExpandContext,
   options?: ResolvedMdExpandOptions,
 ): Promise<string> {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
 
   if (rawPath.includes("FILE_INTERP_EMPTY")) {
     logger?.log(`file: ${token} → skipped (unresolved arg in path)`);
@@ -258,7 +258,7 @@ async function recursivelyExpand(
   args: Map<string, string>,
   options?: ResolvedMdExpandOptions,
 ): Promise<string> {
-  const logger = options ? createDebugLogger(options) : undefined;
+  const logger = options?.debug ? createDebugLogger(options) : undefined;
   if (!hasExpandableToken(raw)) return raw;
   const childVisited = new Set(ctx.visited);
   childVisited.add(resolved);
@@ -268,6 +268,8 @@ async function recursivelyExpand(
     readCache: ctx.readCache,
     args,
     diagnostics: ctx.diagnostics,
+    options: ctx.options ?? options,
+    logger: ctx.logger,
   });
   logger?.log(
     `file: ${token} → ${resolved} recursive expansion (${expanded.length} chars, depth ${ctx.depth + 1})`,
