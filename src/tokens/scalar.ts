@@ -24,18 +24,35 @@ import {
   TOKEN_START,
 } from "../token-syntax";
 
+/** Deferred env token recorded during the arg pass so the env pass can patch known spans. */
 interface PendingEnvToken {
+  /** Start offset (inclusive) in the post-arg-pass output. */
   start: number;
+  /** End offset (exclusive) in the post-arg-pass output. */
   end: number;
+  /** Environment variable name between the prefix and `TOKEN_END`. */
   varName: string;
 }
 
+/**
+ * Result of combined arg/env scalar token expansion.
+ *
+ * Carries the expanded text, protected ranges that must not be scanned in
+ * later passes, file-arg ranges for file-template boundary tracking, and
+ * flags indicating whether file or inline-conditional templates were detected.
+ */
 export interface ScalarExpandResult {
+  /** The expanded text with arg and env tokens substituted. */
   text: string;
+  /** Protected ranges from arg-literal values that must not be rescanned. */
   protectedRanges: ProtectedRange[];
+  /** Ranges inside file-template `file="..."` args that must stay literal during env expansion. */
   fileArgRanges: ProtectedRange[];
+  /** Whether `fileArgRanges` has been collected for this text. */
   fileArgRangesCollected: boolean;
+  /** Whether a `{{ file=... }}` template was detected in the text or any expanded value. */
   hasFileTemplate: boolean;
+  /** Whether an `{{ if=... }}` inline conditional was detected in the text or any expanded value. */
   hasInlineConditionalTemplate: boolean;
 }
 
@@ -47,6 +64,11 @@ export interface ScalarExpandResult {
  * patch known spans instead of scanning the whole string again. File-template
  * arg ranges are collected once after arg expansion so env tokens inside
  * template args remain literal for the imported file.
+ *
+ * @param text - Source text containing `{{arg:...}}` and `{{env:...}}` tokens.
+ * @param args - Map of arg names to their replacement values.
+ * @param options - Resolved expansion options.
+ * @returns The expanded text, protected/file-arg ranges, and template-detection flags.
  */
 export function expandScalarTokens(
   text: string,
@@ -67,6 +89,7 @@ export function expandScalarTokens(
   let recordEnv = true;
   let needsEnvScan = false;
 
+  // Single scan finds both arg and env tokens since they share the `{{` prefix.
   while (true) {
     const start = text.indexOf(FILE_TEMPLATE_START, searchFrom);
     if (start === -1) break;
@@ -75,6 +98,7 @@ export function expandScalarTokens(
       const valueStart = start + ARG_PREFIX.length;
       const end = text.indexOf(TOKEN_END, valueStart);
       if (end === -1) {
+        // Unclosed arg prefix - stop arg expansion; remaining positions are unreliable.
         expandArgs = false;
         searchFrom = start + 1;
         continue;
@@ -90,6 +114,7 @@ export function expandScalarTokens(
       const outStart = out.length;
       out += value;
 
+      // Protect expanded values that contain token delimiters from later expansion passes.
       if (value.indexOf(TOKEN_START) !== -1 || value.indexOf(TOKEN_END) !== -1) {
         protectedRanges ??= [];
         protectedRanges.push({ start: outStart, end: outStart + value.length });
@@ -105,6 +130,7 @@ export function expandScalarTokens(
       const valueStart = start + ENV_PREFIX.length;
       const end = text.indexOf(TOKEN_END, valueStart);
       if (end === -1) {
+        // Unclosed env prefix - invalidate pending-env fast path; full rescan required.
         recordEnv = false;
         needsEnvScan = true;
         searchFrom = start + 1;
@@ -112,10 +138,13 @@ export function expandScalarTokens(
       }
 
       if (end === valueStart) {
+        // Skip empty `{{env:}}` tokens (no variable name).
         searchFrom = valueStart;
         continue;
       }
 
+      // If an arg prefix is nested inside this env token, positions shift and
+      // the pending-env fast path breaks; fall back to a full env rescan.
       const nestedArg = text.indexOf(ARG_PREFIX, valueStart);
       if (nestedArg !== -1 && nestedArg < end) {
         needsEnvScan = true;
@@ -123,6 +152,8 @@ export function expandScalarTokens(
         continue;
       }
 
+      // Record env token with offsets mapped into the post-arg-expansion output,
+      // since arg expansion may have shifted positions relative to the source text.
       pendingEnv ??= [];
       pendingEnv.push({
         start: out.length + start - cursor,
@@ -141,6 +172,8 @@ export function expandScalarTokens(
 
   const argText = changed ? out + text.slice(cursor) : text;
   const argProtectedRanges = protectedRanges ?? EMPTY_RANGES;
+
+  // Fast path: no env tokens found and no need for full rescan.
   if (!pendingEnv?.length && !needsEnvScan) {
     return {
       text: argText,
@@ -153,6 +186,8 @@ export function expandScalarTokens(
   }
 
   const fileArgRanges = collectFileArgRanges(argText, argProtectedRanges);
+
+  // Fallback: malformed token invalidated pending-env offsets; rescan from scratch.
   if (needsEnvScan) {
     return expandEnvTokensInText(
       argText,
@@ -164,6 +199,8 @@ export function expandScalarTokens(
     );
   }
 
+  // Apply pending env tokens using the fast-path offset list,
+  // skipping any that fall inside protected or file-arg ranges.
   const skipRanges = mergeRanges(argProtectedRanges, fileArgRanges);
   const envTokens = pendingEnv!;
   const replacements: ReplacementRange[] = [];
@@ -180,6 +217,8 @@ export function expandScalarTokens(
     const value = rawValue.length ? rawValue : EMPTY_EXPANSION_MARKER;
     logger?.log(`env: ${token.varName} → ${rawValue ? "<set>" : "<unset>"}`);
 
+    // Check expanded env values for nested file/conditional templates so the
+    // caller knows whether to run subsequent expansion passes.
     if (rawValue.length) {
       if (!hasFile && hasFileTemplate(rawValue)) hasFile = true;
       if (!hasInline && hasInlineConditionalTemplate(rawValue)) hasInline = true;
@@ -212,6 +251,13 @@ export function expandScalarTokens(
   };
 }
 
+/**
+ * Fallback env-only expansion that rescans the full text for `{{env:...}}` tokens.
+ *
+ * Used when the fast path (deferred pending-env tokens) is invalid because a
+ * malformed token appeared before valid env tokens, requiring a full scan of
+ * the arg-expanded text while skipping protected and file-arg ranges.
+ */
 function expandEnvTokensInText(
   text: string,
   protectedRanges: ProtectedRange[],
@@ -243,6 +289,7 @@ function expandEnvTokensInText(
     if (end === -1) break;
 
     if (end === valueStart) {
+      // Skip empty `{{env:}}` tokens (no variable name).
       searchFrom = valueStart;
       continue;
     }
@@ -252,6 +299,8 @@ function expandEnvTokensInText(
     const value = rawValue.length ? rawValue : EMPTY_EXPANSION_MARKER;
     logger?.log(`env: ${varName} → ${rawValue ? "<set>" : "<unset>"}`);
 
+    // Check expanded env values for nested file/conditional templates so the
+    // caller knows whether to run subsequent expansion passes.
     if (rawValue.length) {
       if (!hasFile && hasFileTemplate(rawValue)) hasFile = true;
       if (!hasInline && hasInlineConditionalTemplate(rawValue)) hasInline = true;
@@ -285,6 +334,14 @@ function expandEnvTokensInText(
   };
 }
 
+/**
+ * Adjust protected/file-arg range offsets after text replacements shift positions.
+ *
+ * Walks sorted ranges alongside sorted replacements, accumulating a running
+ * delta (replacement length minus replaced span length) and shifting each range
+ * by the cumulative delta of all replacements that end before the range starts.
+ * Assumes replacements and ranges are both sorted by start offset ascending.
+ */
 function remapRanges(ranges: ProtectedRange[], replacements: ReplacementRange[]): ProtectedRange[] {
   if (!ranges.length || !replacements.length) return ranges;
 
