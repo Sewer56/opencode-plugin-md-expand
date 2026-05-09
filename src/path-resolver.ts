@@ -1,7 +1,7 @@
-import path from "node:path"
-import os from "node:os"
+import os from "node:os";
+import path from "node:path";
 
-const HOME_DIR = os.homedir()
+const HOME_DIR = os.homedir();
 
 /**
  * Resolve a raw token path to an absolute filesystem path.
@@ -13,10 +13,10 @@ const HOME_DIR = os.homedir()
  */
 export function resolvePath(raw: string, baseDir: string): string {
   if (raw.startsWith("~/") || raw === "~") {
-    return path.join(HOME_DIR, raw.slice(1))
+    return path.join(HOME_DIR, raw.slice(1));
   }
   if (raw.startsWith("./") || raw.startsWith("../")) {
-    return path.resolve(baseDir, raw)
+    return path.resolve(baseDir, raw);
   }
-  return path.isAbsolute(raw) ? raw : path.resolve(baseDir, raw)
+  return path.isAbsolute(raw) ? raw : path.resolve(baseDir, raw);
 }

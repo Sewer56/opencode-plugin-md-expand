@@ -6,11 +6,12 @@
  *
  * @module test-helpers
  */
-import { afterEach } from "bun:test"
-import { resolveMdExpandOptions } from "./options"
-import fsp from "node:fs/promises"
-import os from "node:os"
-import path from "node:path"
+import { afterEach } from "bun:test";
+import fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { resolveMdExpandOptions } from "./options";
 
 /**
  * Create a temporary directory containing the given files.
@@ -23,13 +24,13 @@ import path from "node:path"
  * @returns Absolute path to the created temp directory.
  */
 export async function makeTmpDir(files: Record<string, string>): Promise<string> {
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "md-expand-test-"))
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "md-expand-test-"));
   for (const [rel, content] of Object.entries(files)) {
-    const full = path.join(dir, rel)
-    await fsp.mkdir(path.dirname(full), { recursive: true })
-    await fsp.writeFile(full, content, "utf8")
+    const full = path.join(dir, rel);
+    await fsp.mkdir(path.dirname(full), { recursive: true });
+    await fsp.writeFile(full, content, "utf8");
   }
-  return dir
+  return dir;
 }
 
 /**
@@ -38,13 +39,13 @@ export async function makeTmpDir(files: Record<string, string>): Promise<string>
  * Push resolved paths here; the `afterEach` hook registered by this module
  * will remove them with `{ recursive: true, force: true }`.
  */
-export const cleanup: string[] = []
+export const cleanup: string[] = [];
 
 afterEach(async () => {
   while (cleanup.length) {
-    await fsp.rm(cleanup.pop()!, { recursive: true, force: true })
+    await fsp.rm(cleanup.pop()!, { recursive: true, force: true });
   }
-})
+});
 
 /**
  * Temporarily set or delete an environment variable and return a restore function.
@@ -57,19 +58,19 @@ afterEach(async () => {
  * @returns A function that restores the original state.
  */
 export function withEnv(key: string, value: string | undefined): () => void {
-  const orig = process.env[key]
+  const orig = process.env[key];
   if (value === undefined) {
-    delete process.env[key]
+    delete process.env[key];
   } else {
-    process.env[key] = value
+    process.env[key] = value;
   }
   return () => {
     if (orig === undefined) {
-      delete process.env[key]
+      delete process.env[key];
     } else {
-      process.env[key] = orig
+      process.env[key] = orig;
     }
-  }
+  };
 }
 
 /**
@@ -80,5 +81,5 @@ export function withEnv(key: string, value: string | undefined): () => void {
  * @param extra - Optional partial options forwarded to `resolveMdExpandOptions`.
  */
 export function opts(extra?: Parameters<typeof resolveMdExpandOptions>[0]) {
-  return resolveMdExpandOptions(extra)
+  return resolveMdExpandOptions(extra);
 }

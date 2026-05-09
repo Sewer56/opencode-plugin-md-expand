@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "sortPackageJson": false,
+  "sortImports": {},
+  "ignorePatterns": ["dist/**"],
+  "embeddedLanguageFormatting": "auto"
+}

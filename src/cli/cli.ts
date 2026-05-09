@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-import { runRenderCli } from "./render"
-import { runValidateCli } from "./validate"
+import { runRenderCli } from "./render";
+import { runValidateCli } from "./validate";
 
 async function main(): Promise<number> {
-  const args = process.argv.slice(2)
-  const command = args[0]
+  const args = process.argv.slice(2);
+  const command = args[0];
 
   if (command === "render" || command === "r") {
-    return runRenderCli(args.slice(1))
+    return runRenderCli(args.slice(1));
   } else if (command === "validate" || command === "v") {
-    return runValidateCli(args.slice(1))
+    return runValidateCli(args.slice(1));
   } else if (command === "--help" || command === "-h" || !command) {
     console.log(`opencode-plugin-md-expand: Expand Markdown prompt templates
 
@@ -29,16 +29,20 @@ Options:
   --help, -h            Show this help
 
 Use "render --help" or "validate --help" for command-specific options.
-`)
-    return 0
+`);
+    return 0;
   } else {
-    console.error(`Unknown command: ${command}`)
-    console.error('Use --help for usage information.')
-    return 1
+    console.error(`Unknown command: ${command}`);
+    console.error("Use --help for usage information.");
+    return 1;
   }
 }
 
-main().then(code => { process.exitCode = code }).catch(err => {
-  console.error(err)
-  process.exitCode = 1
-})
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });

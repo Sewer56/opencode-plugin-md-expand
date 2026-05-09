@@ -1,8 +1,9 @@
-import path from "node:path"
-import { xdgConfig } from "xdg-basedir"
+import path from "node:path";
+
+import { xdgConfig } from "xdg-basedir";
 
 export function xdgConfigOpenCode(): string {
-  return path.join(xdgConfig!, "opencode")
+  return path.join(xdgConfig!, "opencode");
 }
 
 export function defaultConfigDirs(projectDir: string): string[] {
@@ -10,5 +11,5 @@ export function defaultConfigDirs(projectDir: string): string[] {
     path.join(projectDir, ".opencode"),
     path.join(process.cwd(), ".opencode"),
     xdgConfigOpenCode(),
-  ]
+  ];
 }

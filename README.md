@@ -12,7 +12,7 @@ Add to `opencode.json` (or `.opencode/opencode.json`):
 
 ```jsonc
 {
-  "plugin": ["plugins/opencode-plugin-md-expand"]
+  "plugin": ["plugins/opencode-plugin-md-expand"],
 }
 ```
 
@@ -26,9 +26,14 @@ If your config lives in a non-standard location, override with `configDirs`:
 
 ```jsonc
 {
-  "plugin": [["plugins/opencode-plugin-md-expand", {
-    "configDirs": ["./my-custom-config"]
-  }]]
+  "plugin": [
+    [
+      "plugins/opencode-plugin-md-expand",
+      {
+        "configDirs": ["./my-custom-config"],
+      },
+    ],
+  ],
 }
 ```
 
@@ -38,12 +43,12 @@ No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the
 
 ## Options
 
-| Option | Type | Default | Purpose |
-|---|---|---|---|
-| `configDirs` | `string[]` | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir. |
-| `maxDepth` | `number` | `10` | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand. |
-| `debug` | `boolean` | env-based | Write debug logs. Also enabled by `FILE_INTERP_DEBUG=1`, `MD_EXPAND_DEBUG=1`, or `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`. |
-| `logDir` | `string` | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand` | Debug log directory. |
+| Option       | Type       | Default                                                        | Purpose                                                                                                               |
+| ------------ | ---------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `configDirs` | `string[]` | `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]` | Ordered fallback directories for relative `{{ file="./..." }}` includes when not found in project dir.                |
+| `maxDepth`   | `number`   | `10`                                                           | Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                 |
+| `debug`      | `boolean`  | env-based                                                      | Write debug logs. Also enabled by `FILE_INTERP_DEBUG=1`, `MD_EXPAND_DEBUG=1`, or `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`. |
+| `logDir`     | `string`   | `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`      | Debug log directory.                                                                                                  |
 
 ## Template grammar
 
@@ -162,19 +167,14 @@ cat config/plugins/.logs/opencode-plugin-md-expand/debug.log
 ## Library API
 
 ```ts
-import {
-  expand,
-  expandWithDiagnostics,
-  resolvePath,
-  MAX_DEPTH,
-} from "opencode-plugin-md-expand"
+import { expand, expandWithDiagnostics, resolvePath, MAX_DEPTH } from "opencode-plugin-md-expand";
 
 // configDirs auto-derives to OpenCode-standard paths
 const text = await expand(source, projectDir, {
   maxDepth: 10,
-})
+});
 
-const result = await expandWithDiagnostics(source, projectDir)
+const result = await expandWithDiagnostics(source, projectDir);
 ```
 
 ## Development
@@ -185,7 +185,11 @@ bun run typecheck
 bun test
 bun run build
 bun run check
+bun run format        # auto-format all files
+bun run format:check  # check formatting (CI enforces this)
 ```
+
+Editor setup: `.vscode/settings.json` enables format-on-save with oxc.
 
 ## Package shape
 
@@ -195,7 +199,7 @@ OpenCode npm plugin entrypoint is the default export:
 export default {
   id: "opencode-plugin-md-expand",
   server: MdExpandPlugin,
-}
+};
 ```
 
 The package also exports the library API for tests, validation scripts, and benchmarks.

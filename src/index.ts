@@ -1,5 +1,11 @@
-export { PLUGIN_ID, MdExpandPlugin, default } from "./plugin"
-export { expand, expandWithDiagnostics, hasExpandableToken, MAX_DEPTH, resolvePath } from "./expand"
-export { resolveMdExpandOptions } from "./options"
-export type { MdExpandOptions, ResolvedMdExpandOptions } from "./options"
-export type { ExpandWithDiagnosticsResult, ExpansionDiagnostic } from "./types"
+export { PLUGIN_ID, MdExpandPlugin, default } from "./plugin";
+export {
+  expand,
+  expandWithDiagnostics,
+  hasExpandableToken,
+  MAX_DEPTH,
+  resolvePath,
+} from "./expand";
+export { resolveMdExpandOptions } from "./options";
+export type { MdExpandOptions, ResolvedMdExpandOptions } from "./options";
+export type { ExpandWithDiagnosticsResult, ExpansionDiagnostic } from "./types";
