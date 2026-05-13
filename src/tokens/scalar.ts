@@ -53,13 +53,41 @@ interface EnvExpansionValue {
  * Carries the expanded text, protected ranges that must not be scanned in
  * later passes, file-arg ranges for file-template boundary tracking, and
  * flags indicating whether file or inline-conditional templates were detected.
+ *
+ * @example
+ * ```ts
+ * // Input: "Hello {{arg:name}}, home: {{env:HOME}}"
+ * // Args: new Map([["name", "Alice"]])
+ * // Result: { text: "Hello Alice, home: /home/alice", protectedRanges: [], fileArgRanges: [], ... }
+ * ```
  */
 interface ScalarExpandResult {
   /** The expanded text with arg and env tokens substituted. */
   text: string;
-  /** Protected ranges from arg-literal values that must not be rescanned. */
+  /**
+   * Protected ranges covering expanded arg values that must not be rescanned.
+   * Created when an arg value contains token delimiters like `{{` or `}}`.
+   *
+   * @example
+   * ```ts
+   * // Input: "Hello {{arg:name}}" with args = new Map([["name", "{{nested}}"]])
+   * // The expanded "{{nested}}" is protected so it won't be scanned again
+   * // protectedRanges = [{ start: 6, end: 16 }] // covers "{{nested}}"
+   * ```
+   */
   protectedRanges: ProtectedRange[];
-  /** Ranges inside file-template `file="..."` args that must stay literal during env expansion. */
+  /**
+   * Ranges covering non-file argument values in `{{ file="..." key=value }}`
+   * templates that must stay literal during env expansion.
+   *
+   * @example
+   * ```ts
+   * // Input: '{{ file="./tmpl" x="{{env:FOO}}" }}'
+   * // The `{{env:FOO}}` span is protected so it remains literal for the
+   * // imported file template, not expanded in the parent context.
+   * // fileArgRanges = [{ start: 22, end: 34 }] // covers "{{env:FOO}}"
+   * ```
+   */
   fileArgRanges: ProtectedRange[];
   /** Whether `fileArgRanges` has been collected for this text. */
   fileArgRangesCollected: boolean;
@@ -82,6 +110,19 @@ interface ScalarExpandResult {
  * @param args - Map of arg names to their replacement values.
  * @param options - Resolved expansion options.
  * @returns The expanded text, protected/file-arg ranges, and template-detection flags.
+ *
+ * @example
+ * ```ts
+ * // Arg expansion: "Hello {{arg:name}}!" with args=new Map([["name", "World"]])
+ * // → "Hello World!"
+ *
+ * // Env expansion: "Path: {{env:PATH}}" reads from process.env.PATH
+ * // → "Path: /usr/bin:/bin:..."
+ *
+ * // Nested: "{{arg:prefix}}-{{env:SUFFIX}}" expands arg first, then env
+ * // If args.prefix = "{{env:BASE}}" and process.env.BASE = "foo", process.env.SUFFIX = "bar"
+ * // → "foo-bar"
+ * ```
  */
 export function expandScalarTokens(
   text: string,
@@ -278,7 +319,19 @@ export function expandScalarTokens(
  * malformed token appeared before valid env tokens, requiring a full scan of
  * the arg-expanded text while skipping protected and file-arg ranges.
  *
+ * @param text - The arg-expanded text to scan for `{{env:...}}` tokens.
+ * @param protectedRanges - Ranges covering expanded arg values that must not be rescanned.
+ * @param fileArgRanges - Ranges covering non-file argument values in `{{ file="..." }}` templates that must stay literal.
+ * @param hasFile - Current file-template detection flag to update if found.
+ * @param hasInline - Current inline-conditional detection flag to update if found.
+ * @param logger - Optional debug logger for expansion tracing.
  * @param envCache - Shared per-pass cache for env variable lookups and template detection.
+ *
+ * @example
+ * ```ts
+ * // Triggered by malformed token: "{{env:UNCLOSED some text {{env:VALID}}"
+ * // Fast path fails; this function rescans to find {{env:VALID}} while skipping protected ranges
+ * ```
  */
 function expandEnvTokensInText(
   text: string,
@@ -366,6 +419,17 @@ function expandEnvTokensInText(
  * @param cache - Per-pass cache that survives across both the fast-path and
  *   fallback env expansion loops.
  * @returns The resolved env value with pre-computed template-detection flags.
+ *
+ * @example
+ * ```ts
+ * // process.env.HOME = "/home/alice"
+ * getEnvExpansionValue("HOME", cache)
+ * // → { rawValue: "/home/alice", value: "/home/alice", hasFileTemplate: false, ... }
+ *
+ * // process.env.UNSET = undefined
+ * getEnvExpansionValue("UNSET", cache)
+ * // → { rawValue: "", value: "{{__EMPTY__}}", hasFileTemplate: false, ... }
+ * ```
  */
 function getEnvExpansionValue(
   varName: string,
