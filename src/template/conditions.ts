@@ -10,11 +10,20 @@ export interface IfCondition {
 }
 
 /**
- * Evaluate a parsed condition against the current arg scope and process env.
+ * Decide whether a conditional block should expand.
  *
- * Args supplied on the same file-template call override inherited scoped args.
- * Inline conditionals pass an empty template-arg map and therefore read only the
- * current scoped args or environment variables.
+ * Value resolution order:
+ *   1. `source === "env"` → read `process.env[key]`
+ *   2. Otherwise → `templateArgs[key]` overrides `scopedArgs[key]`
+ *      (templateArgs come from the current template call; scopedArgs are
+ *      inherited from the surrounding scope)
+ *
+ * Comparison:
+ *   - No `expected` → truthy check (non-empty string is truthy)
+ *   - With `expected` → strict string equality
+ *   - `negated` inverts the result in both cases
+ *
+ * Returns `true` when `condition` is undefined (no condition = always expand).
  */
 export function shouldExpandForCondition(
   condition: IfCondition | undefined,
