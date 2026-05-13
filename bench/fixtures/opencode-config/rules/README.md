@@ -4,7 +4,7 @@ Agents and commands import rule groups, not individual cards.
 
 - `rules/cards/**` contains reusable rule cards. Cards define judgment only: what to flag, what to allow, severity, and compact examples.
 - `rules/groups/**` is the public import API. Groups define category, read scope, repo-search allowance, ownership, and card bundle.
-- Legacy category-specific wrapper directories have been removed; add new rules as cards and expose them through groups.
+- Add new rules as cards and expose them through groups; there are no category-specific wrapper directories.
 
 Read-scope prefixes:
 

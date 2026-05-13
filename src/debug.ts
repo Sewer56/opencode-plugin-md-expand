@@ -9,7 +9,8 @@ export interface DebugLogger {
 
 /**
  * Creates a debug logger that writes to a log file when debug is enabled.
- * Checks the `debug` flag on resolved options, as well as legacy env vars.
+ * Checks the `debug` flag on resolved options (which already incorporates the
+ * `OPENCODE_PLUGIN_MD_EXPAND_DEBUG` env var).
  */
 export function createDebugLogger(options: ResolvedMdExpandOptions): DebugLogger {
   const debug = options.debug;

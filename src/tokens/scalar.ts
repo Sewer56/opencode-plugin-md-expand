@@ -100,11 +100,11 @@ interface ScalarExpandResult {
 /**
  * Expand synchronous scalar tokens in arg-first/env-second order.
  *
- * This keeps the public expansion semantics of the old two-pass arg/env
- * pipeline, but records env token spans during the arg pass so the env pass can
- * patch known spans instead of scanning the whole string again. File-template
- * arg ranges are collected once after arg expansion so env tokens inside
- * template args remain literal for the imported file.
+ * Expands arg tokens first, recording env token spans encountered during the
+ * arg pass. The env pass then patches those known spans directly instead of
+ * scanning the whole string again. File-template arg ranges are collected once
+ * after arg expansion so env tokens inside template args remain literal for
+ * the imported file.
  *
  * @param text - Source text containing `{{arg:...}}` and `{{env:...}}` tokens.
  * @param args - Map of arg names to their replacement values.
