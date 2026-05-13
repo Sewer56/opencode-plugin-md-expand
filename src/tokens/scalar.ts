@@ -4,6 +4,7 @@ import {
   advanceRangeIndex,
   isInRange,
   mergeRanges,
+  remapRanges,
   type ProtectedRange,
   type ReplacementRange,
 } from "../ranges";
@@ -384,34 +385,4 @@ function getEnvExpansionValue(
 
   cache.set(varName, envValue);
   return envValue;
-}
-
-/**
- * Adjust protected/file-arg range offsets after text replacements shift positions.
- *
- * Walks sorted ranges alongside sorted replacements, accumulating a running
- * delta (replacement length minus replaced span length) and shifting each range
- * by the cumulative delta of all replacements that end before the range starts.
- * Assumes replacements and ranges are both sorted by start offset ascending.
- */
-function remapRanges(ranges: ProtectedRange[], replacements: ReplacementRange[]): ProtectedRange[] {
-  if (!ranges.length || !replacements.length) return ranges;
-
-  const out: ProtectedRange[] = [];
-  let replacementIndex = 0;
-  let delta = 0;
-  for (const range of ranges) {
-    // Accumulate delta from every replacement that ends at or before this range
-    // starts, so the range's shift reflects only replacements that fully precede it.
-    while (
-      replacementIndex < replacements.length &&
-      replacements[replacementIndex].end <= range.start
-    ) {
-      const replacement = replacements[replacementIndex];
-      delta += replacement.length - (replacement.end - replacement.start);
-      replacementIndex++;
-    }
-    out.push({ start: range.start + delta, end: range.end + delta });
-  }
-  return out;
 }

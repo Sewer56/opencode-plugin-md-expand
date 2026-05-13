@@ -1,5 +1,5 @@
 import { ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, FILE_ATTR, IF_ATTR } from "../token-syntax";
-import { isTemplateSpace } from "./scanner";
+import { skipTemplateSpace } from "./scanner";
 
 /** Fast transform gate. Exact file expansion still requires a closing `}}` later. */
 export function hasExpandableToken(text: string): boolean {
@@ -34,21 +34,17 @@ export function hasInlineConditionalTemplate(text: string): boolean {
 /** Fast check for `{{ file=... }}`. Requires `file` first by style rule. Rejects `{{arg:}}` and `{{env:}}`. */
 export function startsFileTemplate(text: string, start: number): boolean {
   if (!text.startsWith(FILE_TEMPLATE_START, start)) return false;
-  let i = start + FILE_TEMPLATE_START.length;
-  while (i < text.length && isTemplateSpace(text.charCodeAt(i))) i++;
+  let i = skipTemplateSpace(text, start + FILE_TEMPLATE_START.length);
   if (!text.startsWith(FILE_ATTR, i)) return false;
-  i += FILE_ATTR.length;
-  while (i < text.length && isTemplateSpace(text.charCodeAt(i))) i++;
+  i = skipTemplateSpace(text, i + FILE_ATTR.length);
   return text.charCodeAt(i) === 61; // =
 }
 
 /** Fast check for `{{ if=... }}`. Requires `if` first by style rule. */
 export function startsInlineIfTemplate(text: string, start: number): boolean {
   if (!text.startsWith(FILE_TEMPLATE_START, start)) return false;
-  let i = start + FILE_TEMPLATE_START.length;
-  while (i < text.length && isTemplateSpace(text.charCodeAt(i))) i++;
+  let i = skipTemplateSpace(text, start + FILE_TEMPLATE_START.length);
   if (!text.startsWith(IF_ATTR, i)) return false;
-  i += IF_ATTR.length;
-  while (i < text.length && isTemplateSpace(text.charCodeAt(i))) i++;
+  i = skipTemplateSpace(text, i + IF_ATTR.length);
   return text.charCodeAt(i) === 61; // =
 }

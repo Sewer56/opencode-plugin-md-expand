@@ -70,6 +70,37 @@ export function isInRange(ranges: ProtectedRange[], index: number, pos: number):
 }
 
 /**
+ * Adjust protected/file-arg range offsets after text replacements shift positions.
+ *
+ * Walks sorted ranges alongside sorted replacements, accumulating a running
+ * delta (replacement length minus replaced span length) and shifting each range
+ * by the cumulative delta of all replacements that end before the range starts.
+ * Assumes replacements and ranges are both sorted by start offset ascending.
+ */
+export function remapRanges(
+  ranges: ProtectedRange[],
+  replacements: ReplacementRange[],
+): ProtectedRange[] {
+  if (!ranges.length || !replacements.length) return ranges;
+
+  const out: ProtectedRange[] = [];
+  let replacementIndex = 0;
+  let delta = 0;
+  for (const range of ranges) {
+    while (
+      replacementIndex < replacements.length &&
+      replacements[replacementIndex].end <= range.start
+    ) {
+      const replacement = replacements[replacementIndex];
+      delta += replacement.length - (replacement.end - replacement.start);
+      replacementIndex++;
+    }
+    out.push({ start: range.start + delta, end: range.end + delta });
+  }
+  return out;
+}
+
+/**
  * Merge two sorted protected-range lists into one sorted list, coalescing
  * overlaps and adjacent (touching) ranges.
  *
