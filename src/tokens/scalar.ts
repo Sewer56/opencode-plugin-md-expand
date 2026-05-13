@@ -54,7 +54,7 @@ interface EnvExpansionValue {
  * later passes, file-arg ranges for file-template boundary tracking, and
  * flags indicating whether file or inline-conditional templates were detected.
  */
-export interface ScalarExpandResult {
+interface ScalarExpandResult {
   /** The expanded text with arg and env tokens substituted. */
   text: string;
   /** Protected ranges from arg-literal values that must not be rescanned. */

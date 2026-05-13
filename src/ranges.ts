@@ -23,17 +23,6 @@ export interface ReplacementRange {
 }
 
 /**
- * Result of synchronous token expansion (env/arg tokens).
- * Includes protected ranges that must be preserved during subsequent expansion passes.
- */
-export interface SyncExpandResult {
-  /** The expanded text with tokens substituted. */
-  text: string;
-  /** Accumulated protected ranges including any new arg-literal spans created during expansion. */
-  protectedRanges: ProtectedRange[];
-}
-
-/**
  * Advance a range cursor past ranges that end at or before `pos`.
  *
  * Used together with {@link isInRange} to maintain a monotonic cursor while

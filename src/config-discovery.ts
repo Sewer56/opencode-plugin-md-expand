@@ -10,6 +10,6 @@ export function defaultConfigDirs(projectDir: string): string[] {
   ];
 }
 
-export function xdgConfigOpenCode(): string {
+function xdgConfigOpenCode(): string {
   return path.join(xdgConfig!, "opencode");
 }
