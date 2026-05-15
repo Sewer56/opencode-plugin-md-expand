@@ -16,17 +16,34 @@ interface FileTemplateSpec {
   condition?: IfCondition;
   /** Inclusive offset of the second `}` in the closing `}}`. */
   end: number;
-  /** Raw spans for non-file arg values; used only by collectFileArgRanges. */
+  /**
+   * Spans covering template-argument values (not the `file=` path).
+   * Returned by `collectFileArgRanges` so callers can protect them
+   * from outer env/inline-conditional expansion.
+   */
   argValueRanges?: ProtectedRange[];
 }
 
 /**
- * Find non-file arg value spans in `{{ file="..." key=value }}` templates.
+ * Find the character spans of template-argument values in
+ * `{{ file="..." key=value }}` templates, excluding the `file=` path.
  *
- * Example: in `{{ file="./tmpl" x="{{env:FOO}}" }}`, this returns the span
- * covering `{{env:FOO}}`. The env pass ignores it at caller level; later,
- * `parseFileTemplate` passes it as literal `x` to `tmpl`. The `file` value is
- * not protected so `{{arg:topic}}` and `{{env:PATH_PART}}` can compose paths.
+ * Each `key=value` pair after `file=` is a "template argument" whose value
+ * is passed literally to the included file. These spans must not be
+ * env-expanded at the outer level; they stay literal so the included file
+ * receives them as-is and can resolve them in its own recursive expansion.
+ * Callers merge the returned ranges into `protectedRanges` so the env
+ * and inline-conditional passes skip them.
+ *
+ * The `file=` path is intentionally excluded so tokens like
+ * `{{env:PATH_PART}}` inside the path *are* expanded at the outer level,
+ * enabling dynamic path composition.
+ *
+ * @example
+ * In `{{ file="./tmpl" x="{{env:FOO}}" }}`, this returns the span covering
+ * `{{env:FOO}}`. The env pass then skips it; `parseFileTemplate` later reads
+ * it as the literal string `{{env:FOO}}`, and the included file sees it as
+ * the value of `{{arg:x}}`.
  */
 export function collectFileArgRanges(
   text: string,
@@ -71,6 +88,19 @@ export function collectFileArgRanges(
  * - common escapes decode in values: `\n`, `\r`, `\t`, `\b`, `\f`, `\v`, `\"`, `\\`
  * - duplicate arg keys use last value; duplicate `file` overwrites path
  * - `if=arg` checks non-empty; `if=arg==value` checks exact equality
+ *
+ * # Errors
+ * Returns `undefined` when the text at `start` does not match a valid
+ * file-template grammar. Callers treat `undefined` as "not a file template"
+ * and leave the text literally.
+ *
+ * Specific failure modes:
+ * - text at `start` does not begin with `{{`
+ * - first attribute key is missing or is not `file=`
+ * - `=` absent after `file` or any attribute key
+ * - a value is empty or malformed (`readTemplateValue` returns `undefined`)
+ * - `if=` condition is malformed (`parseIfCondition` returns `undefined`)
+ * - end of `text` reached without a closing `}}`
  */
 export function parseFileTemplate(
   text: string,
