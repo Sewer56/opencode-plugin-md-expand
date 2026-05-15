@@ -26,6 +26,7 @@
     "bench": "bun bench/transform.bench.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "prepublishOnly": "bun run check",
     "check": "bun run typecheck && bun run test && bun run format:check && bun run build"
   },
   "keywords": [
@@ -35,6 +36,9 @@
     "prompt",
     "templates"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "engines": {
     "opencode": ">=1.0.0"
