@@ -5,8 +5,12 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sewer56/opencode-plugin-md-expand"
+  },
   "bin": {
-    "opencode-plugin-md-expand": "./dist/cli.js"
+    "opencode-plugin-md-expand": "./dist/cli/cli.js"
   },
   "files": [
     "dist",
