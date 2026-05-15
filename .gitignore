@@ -1,3 +1,6 @@
 node_modules
 dist
 .logs
+
+# Sewer's LLM Stuff
+PROMPT-*.md

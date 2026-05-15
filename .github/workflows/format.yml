@@ -1,0 +1,28 @@
+name: Format Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Check formatting
+        id: format-check
+        run: bun run format:check
+
+      - name: Comment on failure
+        if: failure() && steps.format-check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Format check failed. Run `bun run format` locally and push to fix.'
+            })

@@ -1,0 +1,65 @@
+1. Extract paths
+- If `cache_path:` was provided in the task input, use it as-is. Do not derive or transform.
+{{ if=has_cache_derivation }}
+- Otherwise, derive `cache_path` from `{{arg:delta_source}}`: {{arg:cache_derivation}}.
+{{ else }}
+- `cache_path:` from the task input is REQUIRED. Stop and report the missing input if absent.
+{{ endif }}
+- Read `cache_path` if exists; treat missing/malformed as empty.
+{{ if=cache_record_type }}
+- Treat cache as one record {{arg:cache_record_type}} with fields `last_decision`, `open_findings`, `evidence`, `verified`.
+{{ endif }}
+{{ if=has_actions_path }}
+- Parse `actions_path:` if provided. If absent, glob `<cache_path without .md>.actions.*.md` → next `<nnn>`, start `001`.
+{{ endif }}
+
+2. Read handoff
+{{ if=reads_change_plan }}
+- Read `## Change Plan` for per-file scope levels and frozen regions.
+{{ endif }}
+{{ if=single_file_pass }}
+- If the Change Plan lists only one target file: emit PASS with no findings and stop here.
+{{ endif }}
+{{ if=has_inline_delta }}
+- Use the `## Delta` passed inline in the task prompt. If Delta was passed inline, skip reading `{{arg:delta_source}}` for it.
+- If Delta was NOT passed inline, read `## Delta` from `{{arg:delta_source}}`.
+{{ else }}
+- Read `## Delta` from `{{arg:delta_source}}`.
+{{ endif }}
+- Read `### Decisions` only when non-empty.
+{{ if=reads_review_ledger }}
+- Read `## Review Ledger` for prior review state.
+{{ endif }}
+{{ if=step2_extra }}{{arg:step2_extra}}
+{{ endif }}
+3. Select in-scope content
+- Carry forward Verified entries that are Unchanged in Delta.
+- Re-evaluate Changed and New entries.
+- Re-evaluate own Open entries from cache and decision-referenced entries.
+{{ if=has_frozen_regions }}
+- Exclude frozen regions from review.
+{{ endif }}
+
+4. Inspect content
+- Read files listed in Changes Made / Delta. Do not explore repo or search broadly.
+- Apply each Focus check to in-scope content.
+- Check Open→Resolved transitions.
+- On malformed-output retry without new Delta or Decision entries, reuse prior analysis/cache and re-emit valid protocol output.
+
+5. Write files
+- If cache file missing/malformed: write the full cache file at `cache_path`.
+- Otherwise: use targeted edits to update only entries that changed{{ if=preserve_byte_exact }}, preserving unchanged cache text byte-for-byte{{ endif }}.
+{{ if=show_cache_update_detail }}
+  - Replace entries whose fields changed.
+  - Insert new entries in the appropriate section.
+  - Remove pruned {{arg:pruned_unit}}.
+  - Move entries between sections when status transitions (e.g., Open → Resolved).
+  - Leave entries whose content has not changed exactly as they are.
+{{ endif }}
+{{ if=has_actions_path }}
+- Write `actions_path` with only current OPEN findings. No resolved, no Verified Observations, no history, no merge notes.
+{{ endif }}
+- GATE: `cache_path`{{ if=has_actions_path }} and `actions_path`{{ endif }} MUST exist on disk before proceeding. If not: write them. Do not proceed until written.
+
+6. Emit output
+- Emit ONLY the `# REVIEW` fenced block from `# Output`.
