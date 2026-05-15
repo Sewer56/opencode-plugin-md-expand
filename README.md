@@ -1,10 +1,59 @@
 # opencode-plugin-md-expand
 
-OpenCode plugin that expands `{{...}}` templates in `.md` agent, command, mode, skill files, and user messages before the LLM sees them.
+OpenCode plugin that expands `{{...}}` templates in `.md` agent, command, mode,
+skill files, and user messages before the LLM sees them.
 
 > Expand every `{{...}}` in your markdown files.
 
-File includes, environment variables, scoped arguments, and inline conditionals: all resolved before the LLM reads.
+File includes, environment variables, scoped arguments, and inline conditionals:
+all resolved before the LLM reads.
+
+## At a glance
+
+**Include shared rules files in any prompt:**
+
+```md
+You must follow these rules:
+{{ file="./rules/general.md" }}
+{{ file="./rules/style.md" }}
+```
+
+**Inject environment variables at runtime:**
+
+```md
+Base API URL: {{env:API_URL}}
+{{ if=env:CI }}Skip interactive prompts.{{ endif }}
+```
+
+**Switch instructions by mode (a custom arg):**
+
+```md
+{{ file="./review.md" mode=cached }}
+```
+
+Inside `review.md`:
+
+```md
+{{ if=mode==cached }}
+Reuse previous analysis results.
+{{ else }}
+Run a fresh analysis.
+{{ endif }}
+```
+
+**Pass args into a reusable template:**
+
+```md
+{{ file="./template.md" title="Plan Review" domain=correctness }}
+```
+
+Inside `template.md`:
+
+```md
+# {{arg:title}}
+
+Domain: {{arg:domain}}
+```
 
 ## Install in OpenCode
 
