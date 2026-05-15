@@ -1,6 +1,6 @@
 # opencode-plugin-md-expand
 
-OpenCode plugin that expands `{{...}}` templates in `.md` agent, command, mode, and skill files before the LLM sees them.
+OpenCode plugin that expands `{{...}}` templates in `.md` agent, command, mode, skill files, and user messages before the LLM sees them.
 
 > Expand every `{{...}}` in your markdown files.
 
@@ -12,23 +12,45 @@ Add to `opencode.json` (or `.opencode/opencode.json`):
 
 ```jsonc
 {
-  "plugin": ["plugins/opencode-plugin-md-expand"],
+  "plugin": ["opencode-plugin-md-expand@^0.1.0"],
 }
 ```
 
-The plugin auto-derives fallback directories from standard OpenCode paths:
+OpenCode auto-installs npm packages into its cache directory on first
+load - no manual `npm install` needed.
 
-1. `<project>/.opencode`
-2. `<cwd>/.opencode`
-3. `$XDG_CONFIG_HOME/opencode` (e.g. `~/.config/opencode`, symlinked on NixOS)
-
-If your config lives in a non-standard location, override with `configDirs`:
+With options:
 
 ```jsonc
 {
   "plugin": [
     [
-      "plugins/opencode-plugin-md-expand",
+      "opencode-plugin-md-expand@^0.1.0",
+      {
+        "debug": true,
+      },
+    ],
+  ],
+}
+```
+
+## Configuration
+
+The plugin auto-derives fallback directories from standard OpenCode
+paths:
+
+1. `<project>/.opencode`
+2. `<cwd>/.opencode`
+3. `$XDG_CONFIG_HOME/opencode` (e.g. `~/.config/opencode`)
+
+If your config lives in a non-standard location, override with
+`configDirs`:
+
+```jsonc
+{
+  "plugin": [
+    [
+      "opencode-plugin-md-expand@^0.1.0",
       {
         "configDirs": ["./my-custom-config"],
       },
@@ -37,13 +59,15 @@ If your config lives in a non-standard location, override with `configDirs`:
 }
 ```
 
-> `configDirs` **replaces** the three auto-derived defaults entirely. If you only want to _add_ directories while keeping the defaults (project root, cwd, XDG), use `extraConfigDirs` instead:
+> `configDirs` **replaces** the three auto-derived defaults entirely.
+> If you only want to _add_ directories while keeping the defaults
+> (project root, current working directory, `$XDG_CONFIG_HOME`), use `extraConfigDirs` instead:
 
 ```jsonc
 {
   "plugin": [
     [
-      "plugins/opencode-plugin-md-expand",
+      "opencode-plugin-md-expand@^0.1.0",
       {
         "extraConfigDirs": ["{env:HOME}/.config/opencode/extra-md"],
       },
@@ -52,23 +76,24 @@ If your config lives in a non-standard location, override with `configDirs`:
 }
 ```
 
-OpenCode applies `{env:VAR}` substitution to the raw JSON before the plugin sees it, so `{env:HOME}` expands to your home directory at config-load time. This is the recommended way to express absolute paths in `opencode.json` since the runtime defaults (project root, cwd) cannot be written as static strings.
+OpenCode applies `{env:VAR}` substitution to the raw JSON before the
+plugin processes it, so `{env:HOME}` expands to your home directory at
+config-load time.
 
-The CLI and wrapper scripts also respect `OPENCODE_CONFIG_DIR` for runtime overrides.
-
-No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the submodule directory, finds `index.ts`, and loads the plugin directly.
+The CLI and wrapper scripts also respect `OPENCODE_CONFIG_DIR` for
+runtime overrides.
 
 ## Options
 
-| Option            | Description                                                                                                                                                                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `configDirs`      | `string[]` · default `["<project>/.opencode", "<cwd>/.opencode", "<xdg>/opencode"]`. Ordered fallback dirs for relative `{{ file="./..." }}` includes. Replaces defaults entirely.                     |
-| `extraConfigDirs` | `string[]` · default `[]`. Additional dirs **appended** to auto-derived defaults. Ignored when `configDirs` is set.                                                                                    |
-| `maxDepth`        | `number` · default `10`. Maximum recursive file-include depth. At limit, file templates stay literal; env/arg/if still expand.                                                                         |
-| `debug`           | `boolean` · env-based. Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                          |
-| `logDir`          | `string` · default `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`. Debug log directory.                                                                                                     |
-| `initialArgs`     | `Record<string, string>` · default `{}`. Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                    |
-| `cache`           | `boolean` · default `false`. Cache raw and recursively-expanded file content across plugin transform calls. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_CACHE=1`; leave off while editing config files. |
+| Option            | Description                                                                                                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `configDirs`      | `string[]` · default `["<project>/.opencode", "<cwd>/.opencode", "$XDG_CONFIG_HOME/opencode"]`. Ordered fallback dirs for relative `{{ file="./..." }}` includes. Replaces defaults entirely. See [Configuration](#configuration). |
+| `extraConfigDirs` | `string[]` · default `[]`. Additional dirs **appended** to auto-derived defaults. Ignored when `configDirs` is set. See [Configuration](#configuration).                                                                           |
+| `maxDepth`        | `number` · default `10`. Maximum recursive file include depth. At limit, file templates stay literal; env/arg/if still expand.                                                                                                     |
+| `debug`           | `boolean` · env-based. Write debug logs. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_DEBUG=1`.                                                                                                                                      |
+| `logDir`          | `string` · default `<configDirs[0]>/plugins/.logs/opencode-plugin-md-expand`. Debug log directory.                                                                                                                                 |
+| `initialArgs`     | `Record<string, string>` · default `{}`. Key-value pairs injected as `{{arg:*}}` variables for every expansion. Useful for global defaults like `mode` or `domain`.                                                                |
+| `cache`           | `boolean` · default `false`. Cache raw and recursively-expanded file content across plugin transform calls. Also enabled by `OPENCODE_PLUGIN_MD_EXPAND_CACHE=1`; leave off while editing config files.                             |
 
 ## Template grammar
 
@@ -82,9 +107,9 @@ No wrapper `.ts` file needed: OpenCode's `resolvePathPluginTarget()` detects the
 
 Path rules:
 
-- `~/...` resolves under `$HOME`
-- `./...` and `../...` resolve relative to current project/base dir
-- other relative paths resolve relative to current project/base dir
+- `~/...` resolves to `$HOME`
+- `./...` and `../...` resolve relative to `<project>/` or `<cwd>/`
+- other relative paths resolve relative to `<project>/` or `<cwd>/`
 - if `configDirs` is set, missing `./...` / `../...` paths fall back to those directories in order
 
 ### Args
@@ -101,10 +126,12 @@ In `template.md`:
 
 Arg rules:
 
-- undefined `{{arg:key}}` expands empty
+- undefined `{{arg:key}}` expands to an empty string
 - args are scoped to one file include
-- nested file includes do not inherit parent args unless explicitly passed
-- arg values are literal for env/file tokens, but `{{arg:...}}` can cascade in arg values
+- nested file includes do not inherit parent args unless the parent
+  `{{ file=... }}` directive includes them as `key=value` pairs
+- arg values are literal for env/file tokens, but `{{arg:...}}`
+  references can be nested within arg values and are resolved recursively
 
 ### Conditionals
 
@@ -135,18 +162,28 @@ Condition operators:
 
 ## CLI
 
-Build first for published-package bin use:
+Install globally or locally:
 
 ```sh
-bun run build
+npm install -g opencode-plugin-md-expand
 opencode-plugin-md-expand --help
 ```
 
-From source:
+Or add to `devDependencies` and use via `npx`:
 
-```sh
-bun src/cli/cli.ts --help
+```jsonc
+{
+  "devDependencies": {
+    "opencode-plugin-md-expand": "^0.1.0",
+  },
+  "scripts": {
+    "validate": "opencode-plugin-md-expand validate --config-dir config",
+  },
+}
 ```
+
+To run from source (without publishing), use `bun src/cli/cli.ts`
+instead.
 
 ### Validate templates
 
@@ -160,7 +197,8 @@ Validation fails on:
 
 - missing file includes
 - empty file include paths
-- file include cycles
+- file include cycles (circular references where A includes B which
+  includes A)
 - unexpanded `{{ file=... }}` tokens
 - unexpanded `{{ if=... }}` / `{{ endif }}` markers
 - unexpanded `{{arg:...}}` or `{{env:...}}` tokens
@@ -197,38 +235,57 @@ opencode-plugin-md-expand render --config-dir config --debug agent/example.md
 cat config/plugins/.logs/opencode-plugin-md-expand/debug.log
 ```
 
-## Library API
-
-```ts
-import { expand, expandWithDiagnostics, resolvePath, MAX_DEPTH } from "opencode-plugin-md-expand";
-
-// configDirs auto-derives to OpenCode-standard paths
-const text = await expand(source, projectDir, {
-  maxDepth: 10,
-});
-
-// extraConfigDirs appends to auto-derived defaults
-const text2 = await expand(source, projectDir, {
-  extraConfigDirs: ["/custom/config"],
-  initialArgs: { mode: "cached", domain: "correctness" },
-});
-
-const result = await expandWithDiagnostics(source, projectDir);
-```
-
 ## Development
 
+Requires [Bun](https://bun.sh).
+
 ```sh
-bun install
-bun run typecheck
-bun test
-bun run build
-bun run check
-bun run format        # auto-format all files
-bun run format:check  # check formatting (CI enforces this)
+bun install            # install dependencies
+bun run typecheck      # check TypeScript types (no runtime)
+bun test               # run tests
+bun run build          # compile TypeScript to dist/
+bun run check          # run all checks (typecheck + test + format + build)
+bun run format         # auto-format all files
+bun run format:check   # check formatting (CI enforces this)
 ```
 
 Editor setup: `.vscode/settings.json` enables format-on-save with oxc.
+
+### Local path
+
+For development or private forks, reference the plugin directory directly:
+
+```jsonc
+{
+  "plugin": ["plugins/opencode-plugin-md-expand"],
+}
+```
+
+No wrapper `.ts` file needed: OpenCode detects local plugin directories
+and loads them directly from `index.ts` or `package.json`.
+
+### Publishing
+
+GitHub Actions publishes the package to npm when you push a `v*` tag.
+
+Release workflow:
+
+```sh
+npm version patch|minor|major # bumps package.json + creates matching git tag
+git push --follow-tags        # pushes commit + tag → triggers publish.yml
+```
+
+The CI workflow runs a full check (`typecheck`, `test`,
+`format:check`, `build`) before publishing with `--provenance`,
+creating a cryptographically signed link between the published version
+and its originating git commit.
+
+Manual fallback:
+
+```sh
+npm login
+npm publish --provenance --access public
+```
 
 ### Benchmark prompt transforms
 
@@ -238,7 +295,9 @@ The benchmark harness uses Tinybench and copied fixtures from a real OpenCode co
 bun run bench
 ```
 
-It measures the actual `experimental.chat.system.transform` hook for simple imports, deep/complex imports, and no-op static markdown. Override run length when needed:
+It measures the `experimental.chat.system.transform` hook for simple
+imports, deep/complex imports, and no-op static markdown. Override run
+length when needed:
 
 ```sh
 MD_EXPAND_BENCH_TIME_MS=5000 MD_EXPAND_BENCH_MIN_ITERATIONS=512 bun run bench
@@ -254,8 +313,6 @@ export default {
   server: MdExpandPlugin,
 };
 ```
-
-The package also exports the library API for tests, validation scripts, and benchmarks.
 
 ## License
 
