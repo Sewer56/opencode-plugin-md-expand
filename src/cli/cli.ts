@@ -62,6 +62,7 @@ program
     }
     return n;
   })
+  .option("--exclude <glob>", "file path pattern to exclude (repeatable)", collectString, [])
   .option("--debug", "enable debug logging")
   .option("--cache", "enable expansion caching")
   .option("--arg <key=value>", "initial args for expansion (repeatable)", collectArg, {})
@@ -69,6 +70,7 @@ program
     const exitCode = await executeValidate(paths || [], {
       configDir: opts.configDir,
       maxDepth: opts.maxDepth,
+      exclude: opts.exclude,
       debug: opts.debug,
       cache: opts.cache,
       arg: opts.arg,
@@ -80,6 +82,10 @@ function collectArg(value: string, previous: Record<string, string>): Record<str
   const eq = value.indexOf("=");
   if (eq <= 0) throw new Error("--arg requires key=value");
   return { ...previous, [value.slice(0, eq)]: value.slice(eq + 1) };
+}
+
+function collectString(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }
 
 function resolvePath(value: string): string {

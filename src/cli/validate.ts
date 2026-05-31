@@ -10,6 +10,7 @@ export interface ValidateOptions {
   paths?: string[];
   configDir?: string;
   maxDepth?: number;
+  exclude?: string[];
   debug?: boolean;
   cache?: boolean;
   arg?: Record<string, string>;
@@ -52,7 +53,8 @@ export async function executeValidate(
   );
 
   const searchPaths = paths.length ? paths : [configDir];
-  const templateFiles = collectTemplateFiles(searchPaths);
+  const exclude = options.exclude ?? [];
+  const templateFiles = collectTemplateFiles(searchPaths, exclude);
   logger.log(`validate: found ${templateFiles.length} template file(s)`);
 
   if (templateFiles.length === 0) {
@@ -106,26 +108,34 @@ export async function executeValidate(
   }
 }
 
-export function collectTemplateFiles(paths: string[]): string[] {
+export function collectTemplateFiles(paths: string[], exclude: string[] = []): string[] {
   const files: string[] = [];
   for (const p of paths) {
-    collectTemplateFilesFrom(p, files);
+    collectTemplateFilesFrom(p, files, exclude);
   }
   return [...new Set(files)].sort();
 }
 
-export function collectTemplateFilesFrom(dirOrFile: string, into: string[]): void {
+export function collectTemplateFilesFrom(dirOrFile: string, into: string[], exclude: string[] = []): void {
   const stat = fs.statSync(dirOrFile);
   if (stat.isFile()) {
-    if (isTemplateFile(dirOrFile)) into.push(dirOrFile);
+    if (isTemplateFile(dirOrFile) && !isExcluded(dirOrFile, exclude)) into.push(dirOrFile);
     return;
   }
   if (stat.isDirectory()) {
     for (const entry of fs.readdirSync(dirOrFile)) {
       const full = path.join(dirOrFile, entry);
-      collectTemplateFilesFrom(full, into);
+      if (!isExcluded(full, exclude)) collectTemplateFilesFrom(full, into, exclude);
     }
   }
+}
+
+/** Check if `filePath` matches any exclude pattern. Matches against the full path or any trailing segment. */
+function isExcluded(filePath: string, patterns: string[]): boolean {
+  for (const pattern of patterns) {
+    if (filePath === pattern || filePath.endsWith("/" + pattern) || filePath.endsWith("\\" + pattern)) return true;
+  }
+  return false;
 }
 
 export function isTemplateFile(filePath: string): boolean {
