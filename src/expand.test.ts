@@ -1,6 +1,9 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
+import os from "node:os";
+import path from "node:path";
 
 import { expand, expandWithDiagnostics } from "./expand";
+import { clearGitRootCache } from "./git-discovery";
 import { makeTmpDir, withEnv, opts, cleanup } from "./test-helpers";
 
 describe("expand: mixed {{env:...}} and file templates", () => {
@@ -130,5 +133,85 @@ describe("line cleanup", () => {
     expect(lines.length).toBe(2);
     expect(lines[0]).toBe("Line before");
     expect(lines[1]).toBe("Line after");
+  });
+});
+
+describe("expand: {{path:...}} tokens", () => {
+  test("resolves {{path:./file.txt}} relative to baseDir", async () => {
+    const dir = await makeTmpDir({ "placeholder.txt": "content" });
+    cleanup.push(dir);
+    const result = await expand("run={{path:./verify.sh}}", dir, opts());
+    expect(result).toBe(`run=${path.resolve(dir, "./verify.sh")}`);
+  });
+
+  test("resolves {{path:~/file.txt}} to $HOME", async () => {
+    const result = await expand("home={{path:~/file.txt}}", "/tmp", opts());
+    expect(result).toBe(`home=${path.join(os.homedir(), "file.txt")}`);
+  });
+
+  test("arg value introducing {{path:...}} stays literal in single expand pass", async () => {
+    // Arg values containing {{...}} delimiters are protected from re-expansion
+    // within a single expand() call. The caller re-scans on the next call.
+    const dir = await makeTmpDir({});
+    cleanup.push(dir);
+    const result = await expand(
+      "script={{arg:script}}",
+      dir,
+      opts({ initialArgs: { script: "{{path:./verify.sh}}" } }),
+    );
+    expect(result).toBe("script={{path:./verify.sh}}");
+  });
+
+  test("path token works alongside env token", async () => {
+    const dir = await makeTmpDir({});
+    cleanup.push(dir);
+    const restore = withEnv("MD_EXPAND_TEST_REGION", "us-west");
+    try {
+      const result = await expand(
+        "region={{env:MD_EXPAND_TEST_REGION}} path={{path:./run.sh}}",
+        dir,
+        opts(),
+      );
+      expect(result).toBe(`region=us-west path=${path.resolve(dir, "./run.sh")}`);
+    } finally {
+      restore();
+    }
+  });
+
+  test("path token inside file-template arg stays literal", async () => {
+    const dir = await makeTmpDir({
+      "inner.md": "inner-path={{arg:p}}",
+    });
+    cleanup.push(dir);
+    const result = await expand('{{ file="./inner.md" p="{{path:./verify.sh}}" }}', dir, opts());
+    // The {{path:./verify.sh}} should remain literal string "{{path:./verify.sh}}"
+    // inside the file-template arg; it is NOT resolved as an absolute path.
+    expect(result).toBe("inner-path={{path:./verify.sh}}");
+  });
+});
+
+describe("expand: {{gitpath:...}} tokens", () => {
+  beforeEach(() => {
+    clearGitRootCache();
+  });
+
+  test("resolves {{gitpath:...}} relative to git root", async () => {
+    const gitRoot = require("child_process")
+      .execSync("git rev-parse --show-toplevel", { encoding: "utf-8" })
+      .trim();
+    const result = await expand("src={{gitpath:src/main.ts}}", gitRoot, opts());
+    expect(result).toBe(`src=${path.resolve(gitRoot, "src/main.ts")}`);
+  });
+});
+
+describe("expand: no-path-token fast path", () => {
+  test("text with only env tokens (no path) returns correctly", async () => {
+    const restore = withEnv("MD_EXPAND_TEST_FAST", "fast");
+    try {
+      const result = await expand("value={{env:MD_EXPAND_TEST_FAST}}", "/tmp", opts());
+      expect(result).toBe("value=fast");
+    } finally {
+      restore();
+    }
   });
 });

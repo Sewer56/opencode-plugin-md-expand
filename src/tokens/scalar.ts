@@ -1,5 +1,7 @@
 import { createDebugLogger } from "../debug";
+import { findGitRoot } from "../git-discovery";
 import type { ResolvedMdExpandOptions } from "../options";
+import { resolvePath } from "../path-resolver";
 import {
   advanceRangeIndex,
   isInRange,
@@ -11,6 +13,7 @@ import {
 import {
   hasFileTemplate,
   hasInlineConditionalTemplate,
+  hasPathTemplate,
   startsFileTemplate,
   startsInlineIfTemplate,
 } from "../template/detection";
@@ -21,6 +24,8 @@ import {
   EMPTY_RANGES,
   ENV_PREFIX,
   FILE_TEMPLATE_START,
+  GITPATH_PREFIX,
+  PATH_PREFIX,
   TOKEN_END,
   TOKEN_START,
 } from "../token-syntax";
@@ -33,6 +38,18 @@ interface PendingEnvToken {
   end: number;
   /** Environment variable name between the prefix and `TOKEN_END`. */
   varName: string;
+}
+
+/** Deferred path token recorded during the arg pass so the path pass can patch known spans. */
+interface PendingPathToken {
+  /** Start offset (inclusive) in the post-arg-pass output. */
+  start: number;
+  /** End offset (exclusive) in the post-arg-pass output. */
+  end: number;
+  /** Raw path string between `{{path:` / `{{gitpath:` and `}}`. */
+  rawPath: string;
+  /** Which prefix type — determines resolution base. */
+  kind: "path" | "gitpath";
 }
 
 /** Cached value for one env variable within a scalar expansion pass. */
@@ -95,10 +112,20 @@ interface ScalarExpandResult {
   hasFileTemplate: boolean;
   /** Whether an `{{ if=... }}` inline conditional was detected in the text or any expanded value. */
   hasInlineConditionalTemplate: boolean;
+  /**
+   * Whether a `{{path:...}}` or `{{gitpath:...}}` path-resolution token was
+   * detected in the text or any expanded value.
+   *
+   * @example
+   * ```ts
+   * // Input: "run {{path:./verify.sh}}" → hasPathTemplate: true
+   * ```
+   */
+  hasPathTemplate: boolean;
 }
 
 /**
- * Expand synchronous scalar tokens in arg-first/env-second order.
+ * Expand arg, env, and path tokens in arg-first/env-second order.
  *
  * Expands arg tokens first, recording env token spans encountered during the
  * arg pass. The env pass then patches those known spans directly instead of
@@ -106,10 +133,14 @@ interface ScalarExpandResult {
  * after arg expansion so env tokens inside template args remain literal for
  * the imported file.
  *
- * @param text - Source text containing `{{arg:...}}` and `{{env:...}}` tokens.
+ * @param text - Source text containing `{{arg:...}}`, `{{env:...}}`, and path tokens.
  * @param args - Map of arg names to their replacement values.
  * @param options - Resolved expansion options.
- * @returns The expanded text, protected/file-arg ranges, and template-detection flags.
+ * @param baseDir - Base directory for `{{path:...}}` and `{{gitpath:...}}`
+ *   resolution. Defaults to `""`, which causes path tokens to fall back to
+ *   the current working directory.
+ * @returns The expanded text, protected/file-arg ranges, template-detection flags,
+ *   and the `hasPathTemplate` flag.
  *
  * @example
  * ```ts
@@ -128,9 +159,11 @@ export function expandScalarTokens(
   text: string,
   args: Map<string, string>,
   options?: ResolvedMdExpandOptions,
+  baseDir: string = "",
 ): ScalarExpandResult {
   const logger = options?.debug ? createDebugLogger(options) : undefined;
   let pendingEnv: PendingEnvToken[] | undefined;
+  let pendingPath: PendingPathToken[] | undefined;
   let protectedRanges: ProtectedRange[] | undefined;
 
   let out = "";
@@ -139,6 +172,7 @@ export function expandScalarTokens(
   let changed = false;
   let hasFile = false;
   let hasInline = false;
+  let hasPath = false;
   let expandArgs = true;
   let recordEnv = true;
   let needsEnvScan = false;
@@ -221,6 +255,56 @@ export function expandScalarTokens(
       continue;
     }
 
+    // ── {{path:...}} record ──
+    if (text.startsWith(PATH_PREFIX, start)) {
+      const valueStart = start + PATH_PREFIX.length;
+      const end = text.indexOf(TOKEN_END, valueStart);
+      if (end === -1) {
+        searchFrom = start + 1;
+        continue;
+      }
+      const rawPath = text.slice(valueStart, end);
+      if (!rawPath.length) {
+        searchFrom = valueStart;
+        continue;
+      }
+      pendingPath ??= [];
+      pendingPath.push({
+        start: out.length + start - cursor,
+        end: out.length + end + TOKEN_END.length - cursor,
+        rawPath,
+        kind: "path" as const,
+      });
+      searchFrom = end + TOKEN_END.length;
+      hasPath = true;
+      continue;
+    }
+
+    // ── {{gitpath:...}} record ──
+    if (text.startsWith(GITPATH_PREFIX, start)) {
+      const valueStart = start + GITPATH_PREFIX.length;
+      const end = text.indexOf(TOKEN_END, valueStart);
+      if (end === -1) {
+        searchFrom = start + 1;
+        continue;
+      }
+      const rawPath = text.slice(valueStart, end);
+      if (!rawPath.length) {
+        searchFrom = valueStart;
+        continue;
+      }
+      pendingPath ??= [];
+      pendingPath.push({
+        start: out.length + start - cursor,
+        end: out.length + end + TOKEN_END.length - cursor,
+        rawPath,
+        kind: "gitpath" as const,
+      });
+      searchFrom = end + TOKEN_END.length;
+      hasPath = true;
+      continue;
+    }
+
     if (!hasFile && startsFileTemplate(text, start)) hasFile = true;
     if (!hasInline && startsInlineIfTemplate(text, start)) hasInline = true;
 
@@ -231,7 +315,7 @@ export function expandScalarTokens(
   const argProtectedRanges = protectedRanges ?? EMPTY_RANGES;
 
   // Fast path: no env tokens found and no need for full rescan.
-  if (!pendingEnv?.length && !needsEnvScan) {
+  if (!pendingEnv?.length && !needsEnvScan && !pendingPath?.length) {
     return {
       text: argText,
       protectedRanges: argProtectedRanges,
@@ -239,10 +323,44 @@ export function expandScalarTokens(
       fileArgRangesCollected: false,
       hasFileTemplate: hasFile,
       hasInlineConditionalTemplate: hasInline,
+      hasPathTemplate: hasPath,
     };
   }
 
   const fileArgRanges = collectFileArgRanges(argText, argProtectedRanges);
+
+  // ── Apply deferred path tokens ──
+  let pathText = argText;
+  const pathReplacements: ReplacementRange[] = [];
+  if (pendingPath?.length) {
+    const skipRanges = mergeRanges(argProtectedRanges, fileArgRanges);
+    let skipIndex = 0;
+    let pathCursor = 0;
+    let pathOut = "";
+    for (const token of pendingPath) {
+      skipIndex = advanceRangeIndex(skipRanges, skipIndex, token.start);
+      if (isInRange(skipRanges, skipIndex, token.start)) continue;
+      // Fall back to cwd when baseDir is empty (default parameter).
+      const effectiveBaseDir = baseDir || process.cwd();
+      const base =
+        token.kind === "gitpath"
+          ? (findGitRoot(effectiveBaseDir) ?? effectiveBaseDir)
+          : effectiveBaseDir;
+      const resolved = resolvePath(token.rawPath, base);
+      if (token.kind === "gitpath" && base === baseDir) {
+        logger?.log(`gitpath: ${token.rawPath} → ${resolved} (fallback)`);
+      } else {
+        logger?.log(`${token.kind}: ${token.rawPath} → ${resolved}`);
+      }
+      pathOut += argText.slice(pathCursor, token.start) + resolved;
+      pathReplacements.push({ start: token.start, end: token.end, length: resolved.length });
+      pathCursor = token.end;
+    }
+    if (pathReplacements.length) {
+      pathText = pathOut + argText.slice(pathCursor);
+    }
+  }
+
   // Shared env-value cache so both the fast-path and fallback loops avoid
   // redundant process.env reads and template-detection scans.
   const envCache = new Map<string, EnvExpansionValue>();
@@ -250,20 +368,68 @@ export function expandScalarTokens(
   // Fallback: malformed token invalidated pending-env offsets; rescan from scratch.
   if (needsEnvScan) {
     return expandEnvTokensInText(
-      argText,
-      argProtectedRanges,
-      fileArgRanges,
+      pathText,
+      pathReplacements.length
+        ? remapRanges(argProtectedRanges, pathReplacements)
+        : argProtectedRanges,
+      pathReplacements.length ? remapRanges(fileArgRanges, pathReplacements) : fileArgRanges,
       hasFile,
       hasInline,
+      hasPath,
       logger,
       envCache,
     );
   }
 
-  // Apply pending env tokens using the fast-path offset list,
-  // skipping any that fall inside protected or file-arg ranges.
-  const skipRanges = mergeRanges(argProtectedRanges, fileArgRanges);
-  const envTokens = pendingEnv!;
+  // No env tokens to process — return the path-expanded text directly.
+  if (!pendingEnv?.length) {
+    // Path tokens may have been resolved even when no env tokens exist.
+    if (pathReplacements.length || hasPath) {
+      return {
+        text: pathText,
+        protectedRanges: pathReplacements.length
+          ? remapRanges(argProtectedRanges, pathReplacements)
+          : argProtectedRanges,
+        fileArgRanges: pathReplacements.length
+          ? remapRanges(fileArgRanges, pathReplacements)
+          : fileArgRanges,
+        fileArgRangesCollected: true,
+        hasFileTemplate: hasFile,
+        hasInlineConditionalTemplate: hasInline,
+        hasPathTemplate: hasPath,
+      };
+    }
+    return {
+      text: pathText,
+      protectedRanges: argProtectedRanges,
+      fileArgRanges,
+      fileArgRangesCollected: true,
+      hasFileTemplate: hasFile,
+      hasInlineConditionalTemplate: hasInline,
+      hasPathTemplate: hasPath,
+    };
+  }
+
+  // Remap env token offsets from argText to pathText coordinates
+  // when path substitutions have shifted positions.
+  const envTokens = pendingEnv;
+  if (pathReplacements.length) {
+    const remappedOffsets = remapRanges(
+      envTokens.map((t) => ({ start: t.start, end: t.end })),
+      pathReplacements,
+    );
+    for (let i = 0; i < envTokens.length; i++) {
+      envTokens[i].start = remappedOffsets[i].start;
+      envTokens[i].end = remappedOffsets[i].end;
+    }
+  }
+  // Build skip-ranges in pathText coordinate space so they align with remapped env tokens.
+  const skipRanges = mergeRanges(
+    pathReplacements.length
+      ? remapRanges(argProtectedRanges, pathReplacements)
+      : argProtectedRanges,
+    pathReplacements.length ? remapRanges(fileArgRanges, pathReplacements) : fileArgRanges,
+  );
   const replacements: ReplacementRange[] = [];
   let skipIndex = 0;
   out = "";
@@ -285,30 +451,44 @@ export function expandScalarTokens(
       if (!hasInline && envValue.hasInlineConditionalTemplate) hasInline = true;
     }
 
-    out += argText.slice(cursor, token.start) + value;
+    out += pathText.slice(cursor, token.start) + value;
     replacements.push({ start: token.start, end: token.end, length: value.length });
     cursor = token.end;
     changed = true;
   }
 
   if (!changed) {
+    // Path tokens may have been resolved even when no env tokens changed
+    if (pathReplacements.length) {
+      changed = true;
+    }
     return {
-      text: argText,
-      protectedRanges: argProtectedRanges,
-      fileArgRanges,
+      text: pathText,
+      protectedRanges: pathReplacements.length
+        ? remapRanges(argProtectedRanges, pathReplacements)
+        : argProtectedRanges,
+      fileArgRanges: pathReplacements.length
+        ? remapRanges(fileArgRanges, pathReplacements)
+        : fileArgRanges,
       fileArgRangesCollected: true,
       hasFileTemplate: hasFile,
       hasInlineConditionalTemplate: hasInline,
+      hasPathTemplate: hasPath,
     };
   }
 
+  // Combine env and path replacements sorted by start offset so remapRanges
+  // (which assumes replacements are sorted ascending) computes correct deltas.
+  const allReplacements = [...replacements, ...pathReplacements].sort((a, b) => a.start - b.start);
+
   return {
-    text: out + argText.slice(cursor),
-    protectedRanges: remapRanges(argProtectedRanges, replacements),
-    fileArgRanges: remapRanges(fileArgRanges, replacements),
+    text: out + pathText.slice(cursor),
+    protectedRanges: remapRanges(argProtectedRanges, allReplacements),
+    fileArgRanges: remapRanges(fileArgRanges, allReplacements),
     fileArgRangesCollected: true,
     hasFileTemplate: hasFile,
     hasInlineConditionalTemplate: hasInline,
+    hasPathTemplate: hasPath,
   };
 }
 
@@ -324,6 +504,9 @@ export function expandScalarTokens(
  * @param fileArgRanges - Ranges covering non-file argument values in `{{ file="..." }}` templates that must stay literal.
  * @param hasFile - Current file-template detection flag to update if found.
  * @param hasInline - Current inline-conditional detection flag to update if found.
+ * @param hasPath - Current path-template detection flag; forwarded to the
+ *   result so callers know whether `{{path:...}}` or `{{gitpath:...}}`
+ *   tokens were resolved.
  * @param logger - Optional debug logger for expansion tracing.
  * @param envCache - Shared per-pass cache for env variable lookups and template detection.
  *
@@ -339,6 +522,7 @@ function expandEnvTokensInText(
   fileArgRanges: ProtectedRange[],
   hasFile: boolean,
   hasInline: boolean,
+  hasPath: boolean,
   logger: ReturnType<typeof createDebugLogger> | undefined,
   envCache: Map<string, EnvExpansionValue>,
 ): ScalarExpandResult {
@@ -397,6 +581,7 @@ function expandEnvTokensInText(
       fileArgRangesCollected: true,
       hasFileTemplate: hasFile,
       hasInlineConditionalTemplate: hasInline,
+      hasPathTemplate: hasPath,
     };
   }
 
@@ -407,6 +592,7 @@ function expandEnvTokensInText(
     fileArgRangesCollected: true,
     hasFileTemplate: hasFile,
     hasInlineConditionalTemplate: hasInline,
+    hasPathTemplate: hasPath,
   };
 }
 

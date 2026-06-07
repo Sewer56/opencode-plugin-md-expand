@@ -81,6 +81,11 @@ const BENCHMARK_CASES: BenchmarkCase[] = [
     relativePath: "rules/README.md",
     description: "small no-op markdown with no substitutions",
   },
+  {
+    name: "path-tokens",
+    relativePath: "agent/_templates/path-resolution.md",
+    description: "path and gitpath scalar token resolution (no file I/O)",
+  },
 ];
 
 const time = readPositiveIntegerEnv("MD_EXPAND_BENCH_TIME_MS", DEFAULT_TIME_MS);

@@ -55,6 +55,18 @@ Inside `template.md`:
 Domain: {{arg:domain}}
 ```
 
+**Reference scripts and files by absolute path:**
+
+```md
+After changes, run `{{path:.cargo/verify.sh}}` before returning.
+```
+
+`{{path:...}}` resolves relative to current working directory.
+`{{gitpath:...}}` resolves relative to the repository root.
+
+(Path tokens emit absolute paths without reading the file - see
+[Path resolution](#path-resolution) in Template grammar.)
+
 ## Install in OpenCode
 
 Add to `opencode.json` (or `.opencode/opencode.json`):
@@ -182,6 +194,32 @@ Arg rules:
 - arg values are literal for env/file tokens, but `{{arg:...}}`
   references can be nested within arg values and are resolved recursively
 
+### Path resolution
+
+```md
+Run {{path:.cargo/verify.sh}} before committing.
+Source: {{gitpath:src/main.ts}}
+```
+
+Path tokens:
+
+- `{{path:./file.sh}}` -- relative to current working directory
+- `{{path:../sibling/file.txt}}` -- `../` relative to current working directory
+- `{{path:~/file.txt}}` -- `~/` expands to `$HOME`
+- `{{gitpath:src/main.ts}}` -- relative to git root
+- `{{gitpath:...}}` -- fallback to base directory outside git repo
+
+`{{path:...}}` and `{{gitpath:...}}` are tokens that
+emit an absolute path string without reading the file. They are resolved
+during the same expansion pass as `{{env:...}}` and `{{arg:...}}`.
+
+Rules:
+
+- The path must be a literal string; env/arg interpolation inside the
+  path value is not supported.
+- `{{gitpath:...}}` discovers the git root via `git rev-parse --show-toplevel`,
+  with a module-level cache so repeated lookups in the same expansion are free.
+
 ### Conditionals
 
 ```md
@@ -251,6 +289,7 @@ Validation fails on:
 - unexpanded `{{ file=... }}` tokens
 - unexpanded `{{ if=... }}` / `{{ endif }}` markers
 - unexpanded `{{arg:...}}` or `{{env:...}}` tokens
+- unexpanded `{{path:...}}` or `{{gitpath:...}}` tokens
 
 Git hook example:
 

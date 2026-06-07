@@ -1,4 +1,12 @@
-import { ARG_PREFIX, ENV_PREFIX, FILE_TEMPLATE_START, FILE_ATTR, IF_ATTR } from "../token-syntax";
+import {
+  ARG_PREFIX,
+  ENV_PREFIX,
+  FILE_ATTR,
+  FILE_TEMPLATE_START,
+  GITPATH_PREFIX,
+  IF_ATTR,
+  PATH_PREFIX,
+} from "../token-syntax";
 import { skipTemplateSpace } from "./scanner";
 
 /**
@@ -16,6 +24,8 @@ export function hasExpandableToken(text: string): boolean {
     if (startsFileTemplate(text, start) || startsInlineIfTemplate(text, start)) return true;
     if (text.startsWith(ARG_PREFIX, start)) return true;
     if (text.startsWith(ENV_PREFIX, start)) return true;
+    if (text.startsWith(PATH_PREFIX, start)) return true;
+    if (text.startsWith(GITPATH_PREFIX, start)) return true;
     // Advance past current match to continue scanning
     start = text.indexOf(FILE_TEMPLATE_START, start + 1);
   }
@@ -55,6 +65,19 @@ export function hasInlineConditionalTemplate(text: string): boolean {
 }
 
 /**
+ * Check whether `text` contains a `{{path:...}}` or `{{gitpath:...}}` token.
+ *
+ * Fast string-includes check used by `expand()` to decide whether path-related
+ * re-scanning is necessary after arg/env substitution.
+ *
+ * @param text - Source text to scan.
+ * @returns `true` when at least one path or gitpath token is found.
+ */
+export function hasPathTemplate(text: string): boolean {
+  return text.includes(PATH_PREFIX) || text.includes(GITPATH_PREFIX);
+}
+
+/**
  * Fast check for `{{ file=... }}`. Requires `file` first by style rule.
  * Rejects `{{arg:}}` and `{{env:}}`.
  *
@@ -89,4 +112,15 @@ export function startsInlineIfTemplate(text: string, start: number): boolean {
   // Skip whitespace between the attribute name and `=`
   i = skipTemplateSpace(text, i + IF_ATTR.length);
   return text.charCodeAt(i) === 61; // =
+}
+
+/**
+ * Fast check for `{{path:...}}` or `{{gitpath:...}}` at position `start`.
+ *
+ * @param text - Source text containing the candidate opening.
+ * @param start - Index of the `{{` opening to validate.
+ * @returns `true` when `text` at `start` begins a path or gitpath scalar token.
+ */
+export function startsPathTemplate(text: string, start: number): boolean {
+  return text.startsWith(PATH_PREFIX, start) || text.startsWith(GITPATH_PREFIX, start);
 }
