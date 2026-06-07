@@ -116,7 +116,11 @@ export function collectTemplateFiles(paths: string[], exclude: string[] = []): s
   return [...new Set(files)].sort();
 }
 
-export function collectTemplateFilesFrom(dirOrFile: string, into: string[], exclude: string[] = []): void {
+export function collectTemplateFilesFrom(
+  dirOrFile: string,
+  into: string[],
+  exclude: string[] = [],
+): void {
   const stat = fs.statSync(dirOrFile);
   if (stat.isFile()) {
     if (isTemplateFile(dirOrFile) && !isExcluded(dirOrFile, exclude)) into.push(dirOrFile);
@@ -133,7 +137,12 @@ export function collectTemplateFilesFrom(dirOrFile: string, into: string[], excl
 /** Check if `filePath` matches any exclude pattern. Matches against the full path or any trailing segment. */
 function isExcluded(filePath: string, patterns: string[]): boolean {
   for (const pattern of patterns) {
-    if (filePath === pattern || filePath.endsWith("/" + pattern) || filePath.endsWith("\\" + pattern)) return true;
+    if (
+      filePath === pattern ||
+      filePath.endsWith("/" + pattern) ||
+      filePath.endsWith("\\" + pattern)
+    )
+      return true;
   }
   return false;
 }

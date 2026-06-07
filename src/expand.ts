@@ -6,6 +6,7 @@ import {
   hasExpandableToken,
   hasFileTemplate,
   hasInlineConditionalTemplate,
+  hasPathTemplate,
 } from "./template/detection";
 import { collectFileArgRanges } from "./template/file-parser";
 import { MAX_DEPTH, FILE_TEMPLATE_START, EMPTY_ARGS, EMPTY_EXPANSION_MARKER } from "./token-syntax";
@@ -64,7 +65,7 @@ export interface ExpandWithDiagnosticsResult {
 
 // Re-export for external consumers
 export { resolvePath } from "./path-resolver";
-export { hasExpandableToken } from "./template/detection";
+export { hasExpandableToken, hasPathTemplate } from "./template/detection";
 export { MAX_DEPTH } from "./token-syntax";
 
 /**
@@ -121,7 +122,7 @@ export async function expand(
   }
 
   const scalarInput = text;
-  const scalarResult = expandScalarTokens(text, ctx.args, options);
+  const scalarResult = expandScalarTokens(text, ctx.args, options, baseDir);
   text = scalarResult.text;
   const protectedRanges = scalarResult.protectedRanges;
   let fileArgRanges = scalarResult.fileArgRanges;

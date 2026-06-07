@@ -110,7 +110,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
         const entry = output.system[i];
         if (!hasExpandableToken(entry)) continue;
         logger?.log(`system[${i}]: expanding tokens (${entry.length} chars)`);
-        output.system[i] = await expand(entry, input.directory, effectiveOptions, createContext());
+        output.system[i] = await expand(entry, process.cwd(), effectiveOptions, createContext());
       }
     },
     "experimental.chat.messages.transform": async (
@@ -125,7 +125,7 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
           if (part.type !== "text" || !part.text) continue;
           if (!hasExpandableToken(part.text)) continue;
           logger?.log(`user-message-part[${i}]: expanding tokens (${part.text.length} chars)`);
-          part.text = await expand(part.text, input.directory, effectiveOptions, createContext());
+          part.text = await expand(part.text, process.cwd(), effectiveOptions, createContext());
         }
       }
     },

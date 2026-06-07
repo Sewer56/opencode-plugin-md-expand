@@ -26,6 +26,8 @@ export const ENDIF_ATTR = "endif";
 export const ENV_CONDITION_PREFIX = "env:";
 export const ENV_PREFIX = "{{env:";
 export const ARG_PREFIX = "{{arg:";
+export const PATH_PREFIX = "{{path:";
+export const GITPATH_PREFIX = "{{gitpath:";
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  Configuration
