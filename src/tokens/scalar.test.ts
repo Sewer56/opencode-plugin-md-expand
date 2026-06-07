@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { clearGitRootCache } from "../git-discovery";
-import { opts } from "../test-helpers";
+import { opts, withEnv } from "../test-helpers";
 import { expandScalarTokens } from "./scalar";
 
 const BASE = "/project";
@@ -120,6 +120,36 @@ describe("expandScalarTokens: path + arg/env interaction", () => {
       BASE,
     );
     expect(result.text).toContain(path.resolve(BASE, "./file.txt"));
+  });
+
+  test("protected ranges remap correctly when path token precedes env token", () => {
+    // Path token comes before env token in source text. The combined
+    // replacements list (env replacements + path replacements) must be
+    // sorted by start offset so remapRanges computes correct deltas
+    // for protected ranges and file-arg ranges.
+    const restore = withEnv("MD_EXPAND_TEST", "ok");
+    try {
+      const args = new Map([["arg1", "{{nested}}"]]);
+      const result = expandScalarTokens(
+        "p={{path:./a.txt}} a={{arg:arg1}} e={{env:MD_EXPAND_TEST}}",
+        args,
+        opts(),
+        BASE,
+      );
+      // Path resolves, env expands, arg expands with protected range
+      expect(result.text).toContain(path.resolve(BASE, "./a.txt"));
+      expect(result.text).toContain("{{nested}}");
+      expect(result.text).toContain("ok");
+      // One protected range for the nested {{...}} in the arg value
+      expect(result.protectedRanges.length).toBe(1);
+      // The protected range should cover "{{nested}}" in the final output.
+      // Compute its expected start offset:
+      const prefix = `p=${path.resolve(BASE, "./a.txt")} a=`;
+      expect(result.protectedRanges[0].start).toBe(prefix.length);
+      expect(result.protectedRanges[0].end).toBe(prefix.length + "{{nested}}".length);
+    } finally {
+      restore();
+    }
   });
 
   test("path tokens inside file-template arg values stay literal", () => {

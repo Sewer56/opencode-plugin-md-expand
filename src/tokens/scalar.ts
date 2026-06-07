@@ -477,16 +477,14 @@ export function expandScalarTokens(
     };
   }
 
-  // Include path replacements in the final replacement list so remapRanges
-  // in the changed return accounts for both env and path offset shifts.
-  for (const pr of pathReplacements) {
-    replacements.push(pr);
-  }
+  // Combine env and path replacements sorted by start offset so remapRanges
+  // (which assumes replacements are sorted ascending) computes correct deltas.
+  const allReplacements = [...replacements, ...pathReplacements].sort((a, b) => a.start - b.start);
 
   return {
     text: out + pathText.slice(cursor),
-    protectedRanges: remapRanges(argProtectedRanges, replacements),
-    fileArgRanges: remapRanges(fileArgRanges, replacements),
+    protectedRanges: remapRanges(argProtectedRanges, allReplacements),
+    fileArgRanges: remapRanges(fileArgRanges, allReplacements),
     fileArgRangesCollected: true,
     hasFileTemplate: hasFile,
     hasInlineConditionalTemplate: hasInline,
