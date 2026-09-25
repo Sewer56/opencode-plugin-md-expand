@@ -73,7 +73,7 @@ Add to `opencode.json` (or `.opencode/opencode.json`):
 
 ```jsonc
 {
-  "plugin": ["opencode-plugin-md-expand@^0.1.0"],
+  "plugin": ["opencode-plugin-md-expand@^0.3.0"],
 }
 ```
 
@@ -86,7 +86,7 @@ With options:
 {
   "plugin": [
     [
-      "opencode-plugin-md-expand@^0.1.0",
+      "opencode-plugin-md-expand@^0.3.0",
       {
         "debug": true,
       },
@@ -111,7 +111,7 @@ If your config lives in a non-standard location, override with
 {
   "plugin": [
     [
-      "opencode-plugin-md-expand@^0.1.0",
+      "opencode-plugin-md-expand@^0.3.0",
       {
         "configDirs": ["./my-custom-config"],
       },
@@ -261,7 +261,7 @@ Or add to `devDependencies` and use via `npx`:
 ```jsonc
 {
   "devDependencies": {
-    "opencode-plugin-md-expand": "^0.1.0",
+    "opencode-plugin-md-expand": "^0.3.0",
   },
   "scripts": {
     "validate": "opencode-plugin-md-expand validate --config-dir config",
