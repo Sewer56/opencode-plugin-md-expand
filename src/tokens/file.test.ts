@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { expand, expandWithDiagnostics } from "../expand";
+import type { CommentErrors } from "../template/comments";
 import { makeTmpDir, withEnv, opts, cleanup } from "../test-helpers";
 import { MAX_DEPTH } from "../token-syntax";
 
@@ -656,5 +657,51 @@ describe("expand: include boundary whitespace", () => {
     cleanup.push(dir);
     const result = await expand(`{{ file="./outer.md" }}`, dir, opts());
     expect(result).toBe("Outer-before\nMiddle-before\nInner-content\nMiddle-after\nOuter-after");
+  });
+});
+
+describe("expand: author comments in included files", () => {
+  test("included_file_should_drop_comments_and_their_tokens", async () => {
+    // Arrange
+    const dir = await makeTmpDir({
+      "rule.md": 'Keep it short.\n\n<!---\nExample:\n{{ file="./missing.md" }}\n--->\n\nNext rule.',
+    });
+    cleanup.push(dir);
+
+    // Act
+    const result = await expandWithDiagnostics(`{{ file="./rule.md" }}`, dir, opts());
+
+    // Assert
+    expect(result.text).toBe("Keep it short.\n\nNext rule.");
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("config_dir_fallback_should_drop_comments_and_record_bad_ones", async () => {
+    // Arrange
+    const configDir = await makeTmpDir({ "rule.md": "<!--- note --->\nRULE\n<!--- open" });
+    const baseDir = await makeTmpDir({});
+    cleanup.push(configDir, baseDir);
+    const options = opts({ configDirs: [configDir] });
+    const commentErrors: CommentErrors[] = [];
+
+    // Act
+    const result = await expand(`{{ file="./rule.md" }}`, baseDir, options, {
+      visited: new Set(),
+      depth: 0,
+      readCache: new Map(),
+      args: options.initialArgs,
+      commentErrors,
+      options,
+    });
+
+    // Assert
+    expect(result).toBe("RULE\n<!--- open");
+    expect(commentErrors).toEqual([
+      {
+        path: path.join(configDir, "rule.md"),
+        text: "<!--- note --->\nRULE\n<!--- open",
+        offsets: [21],
+      },
+    ]);
   });
 });

@@ -3,8 +3,9 @@ import path from "node:path";
 
 import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
-import { expandWithDiagnostics, hasExpandableToken } from "../expand";
+import { expand, hasExpandableToken, type ExpansionDiagnostic } from "../expand";
 import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
+import { COMMENT_START, stripComments, type CommentErrors } from "../template/comments";
 
 export interface ValidateOptions {
   paths?: string[];
@@ -17,16 +18,7 @@ export interface ValidateOptions {
 }
 
 function lineColumn(text: string, index: number): { line: number; column: number } {
-  let line = 1;
-  let lineStart = 0;
-  for (let i = 0; i < index; i++) {
-    const code = text.charCodeAt(i);
-    if (code !== 10 && code !== 13) continue;
-    if (code === 13 && text.charCodeAt(i + 1) === 10) i++;
-    line++;
-    lineStart = i + 1;
-  }
-  return { line, column: index - lineStart + 1 };
+  return lineColumns(text, [index])[0];
 }
 
 export async function executeValidate(
@@ -63,40 +55,63 @@ export async function executeValidate(
   }
 
   let errorCount = 0;
+  // Comments already reported, as `path:offset`. Shared files are reported once.
+  const reportedComments = new Set<string>();
 
   for (const file of templateFiles) {
     logger.log(`validate: processing ${file}`);
-    let content: string;
+    let source: string;
     try {
-      content = (await Bun.file(file).text()).trim();
+      source = await Bun.file(file).text();
     } catch (err: unknown) {
       console.error(`${file}: cannot read: ${(err as Error).message}`);
       errorCount++;
       continue;
     }
 
-    if (!hasExpandableToken(content)) {
-      logger.log(`validate: ${file}: no expandable tokens, skipping`);
-      continue;
-    }
+    // Report malformed comments, then validate only the text the model sees.
+    const offsets: number[] = [];
+    const removed: { start: number; end: number }[] = [];
+    const content = stripComments(source, offsets, removed).trim();
+    const commentErrors: CommentErrors[] = [];
+    if (offsets.length) commentErrors.push({ path: path.resolve(file), text: source, offsets });
+    // Source with comments blanked out, so template errors point at their real line.
+    const located = blankRanges(source, removed);
 
-    const result = await expandWithDiagnostics(content, configDir, effectiveOptions);
-    const remainingFailures = collectRemainingTokenFailures(result.text);
-
-    if (result.diagnostics.length > 0 || remainingFailures.length > 0) {
-      for (const diag of result.diagnostics) {
-        const diagLoc = resolveDiagnostic(file, content, diag);
-        console.log(formatDiagnostic(diagLoc));
-      }
-      for (const failure of remainingFailures) {
-        const failLoc = locateRemaining(file, content, failure);
-        if (failLoc) console.log(formatDiagnostic(failLoc));
-        else console.log(`${file}: unclosed/malformed token: ${failure.token}`);
-      }
-      errorCount += result.diagnostics.length + remainingFailures.length;
+    // Expand templates, collecting bad comments from included files too.
+    let diagnostics: ExpansionDiagnostic[] = [];
+    let remainingFailures: TokenFailure[] = [];
+    if (hasExpandableToken(content)) {
+      const expanded = await expand(content, configDir, effectiveOptions, {
+        visited: new Set(),
+        depth: 0,
+        readCache: new Map(),
+        expandedFileCache: effectiveOptions.cache ? new Map() : undefined,
+        args: effectiveOptions.initialArgs,
+        diagnostics,
+        commentErrors,
+        options: effectiveOptions,
+        logger: effectiveOptions.debug ? logger : undefined,
+      });
+      remainingFailures = collectRemainingTokenFailures(expanded);
     } else {
-      logger.log(`validate: ${file}: OK`);
+      logger.log(`validate: ${file}: no expandable tokens, skipping`);
     }
+
+    // Print comment errors first, then template errors.
+    const commentCount = reportCommentErrors(commentErrors, reportedComments);
+    for (const diag of diagnostics) {
+      console.log(formatDiagnostic(resolveDiagnostic(file, located, diag)));
+    }
+    for (const failure of remainingFailures) {
+      const failLoc = locateRemaining(file, located, failure);
+      if (failLoc) console.log(formatDiagnostic(failLoc));
+      else console.log(`${file}: unclosed/malformed token: ${failure.token}`);
+    }
+
+    const fileErrors = commentCount + diagnostics.length + remainingFailures.length;
+    errorCount += fileErrors;
+    if (!fileErrors) logger.log(`validate: ${file}: OK`);
   }
 
   if (errorCount > 0) {
@@ -230,12 +245,80 @@ function collectRemainingTokenFailures(text: string): TokenFailure[] {
   return failures;
 }
 
+/**
+ * Print each malformed comment not yet reported and return how many were printed.
+ *
+ * @param errors   - Malformed comments grouped by file, offsets ascending.
+ * @param reported - `path:offset` keys already printed; updated in place.
+ */
+function reportCommentErrors(errors: CommentErrors[], reported: Set<string>): number {
+  let count = 0;
+  for (const { path: file, text, offsets } of errors) {
+    const fresh = offsets.filter((offset) => !reported.has(`${file}:${offset}`));
+    const locations = lineColumns(text, fresh);
+    for (let i = 0; i < fresh.length; i++) {
+      reported.add(`${file}:${fresh[i]}`);
+      console.log(
+        formatDiagnostic({
+          file,
+          ...locations[i],
+          kind: "malformed-comment",
+          token: COMMENT_START,
+          message: "comment needs a closing ---> at the end of a line",
+        }),
+      );
+    }
+    count += fresh.length;
+  }
+  return count;
+}
+
+/**
+ * Replace each range with spaces, keeping line breaks.
+ * Offsets and line numbers then still match the original text.
+ */
+function blankRanges(text: string, ranges: { start: number; end: number }[]): string {
+  if (!ranges.length) return text;
+  let out = "";
+  let cursor = 0;
+  for (const { start, end } of ranges) {
+    out += text.slice(cursor, start) + text.slice(start, end).replace(/[^\r\n]/g, " ");
+    cursor = end;
+  }
+  return out + text.slice(cursor);
+}
+
+/** Return line and column numbers for ascending offsets in one pass. */
+function lineColumns(text: string, offsets: number[]): { line: number; column: number }[] {
+  const out: { line: number; column: number }[] = [];
+  let line = 1;
+  let lineStart = 0;
+  let i = 0;
+  for (const offset of offsets) {
+    for (; i < offset; i++) {
+      const code = text.charCodeAt(i);
+      if (code !== 10 && code !== 13) continue;
+      if (code === 13 && text.charCodeAt(i + 1) === 10) i++;
+      line++;
+      lineStart = i + 1;
+    }
+    out.push({ line, column: offset - lineStart + 1 });
+  }
+  return out;
+}
+
 function locateRemaining(
   file: string,
   content: string,
   failure: TokenFailure,
 ): LocatedDiagnostic | undefined {
-  const { line, column } = lineColumn(content, failure.index);
+  // `failure.index` points into expanded text, so find the token's first line in the source.
+  // Give up when it is missing or appears more than once.
+  const newline = failure.token.indexOf("\n");
+  const opener = newline === -1 ? failure.token : failure.token.slice(0, newline);
+  const found = content.indexOf(opener);
+  if (found === -1 || content.indexOf(opener, found + 1) !== -1) return undefined;
+  const { line, column } = lineColumn(content, found);
   return {
     file,
     line,

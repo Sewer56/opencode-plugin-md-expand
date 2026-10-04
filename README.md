@@ -67,6 +67,14 @@ After changes, run `{{path:.cargo/verify.sh}}` before returning.
 (Path tokens emit absolute paths without reading the file - see
 [Path resolution](#path-resolution) in Template grammar.)
 
+**Leave notes for humans in agent and rule files:**
+
+```md
+<!--- Example of the expected style; removed before the model reads it. --->
+```
+
+See [Comments](#comments) for where they work.
+
 ## Install in OpenCode
 
 Add to `opencode.json` (or `.opencode/opencode.json`):
@@ -247,6 +255,52 @@ Condition operators:
 - `==` - exact equality (`if=arg==value` includes when arg equals value)
 - `!=` - inequality (`if=arg!=value` includes when arg differs from value; `if=arg!=` includes when arg is empty or absent)
 
+### Comments
+
+Wrap notes and examples meant only for people in `<!--- ... --->`.
+Editors highlight them like HTML comments.
+
+The plugin removes them from system prompts and included files before the
+model reads the text.
+
+````md
+Return early instead of nesting `if` blocks.
+
+<!---
+For reviewers, the shape we want:
+
+```rust
+let Some(user) = find_user(id) else {
+    return Err(Error::NotFound);
+};
+```
+--->
+
+Name errors after what went wrong, not where.
+````
+
+The model receives:
+
+```md
+Return early instead of nesting `if` blocks.
+
+Name errors after what went wrong, not where.
+```
+
+Rules:
+
+- `<!---` must be the first text on its line. The comment ends at the next
+  `--->`, which must be the last text on its line.
+- A comment can span any number of lines.
+- Drop comment lines. After a blank line or at text start.
+- Also drop one following blank line.
+- Templates inside a removed comment are not expanded.
+- Comments are removed everywhere, code, files, sys prompts, etc.
+- User messages and command bodies keep comment markers.
+- Plain HTML comment markers (`<!-- ... -->`) are not stripped.
+- A malformed comment (no closing `--->`, or text after it on the same line)
+  is not stripped.
+
 ## CLI
 
 Install globally or locally:
@@ -290,6 +344,7 @@ Validation fails on:
 - unexpanded `{{ if=... }}` / `{{ endif }}` markers
 - unexpanded `{{arg:...}}` or `{{env:...}}` tokens
 - unexpanded `{{path:...}}` or `{{gitpath:...}}` tokens
+- comments with no closing `--->`, or with text after `--->` on the same line
 
 Git hook example:
 

@@ -5,7 +5,9 @@
  * The hooks expand templates before the text reaches the model.
  *
  * Templates include `{{arg:*}}`, `{{env:*}}`, inline conditions and file
- * references. OpenCode 2 uses the same expansion engine in `expand.ts`.
+ * references.
+ * System prompts also lose their `<!--- --->` author comments.
+ * OpenCode 2 uses the same expansion engine in `expand.ts`.
  */
 
 import type { Plugin, PluginOptions } from "@opencode-ai/plugin";
@@ -16,6 +18,7 @@ import { expand, hasExpandableToken } from "./expand";
 import type { ExpandContext } from "./expand";
 import type { MdExpandOptions } from "./options";
 import { resolveMdExpandOptions } from "./options";
+import { stripComments } from "./template/comments";
 
 /** Stable plugin ID used by OpenCode for registration and deduplication. */
 export const PLUGIN_ID = "opencode-plugin-md-expand";
@@ -84,9 +87,10 @@ export const MdExpandPlugin: Plugin = async (input, options) => {
 
   return {
     "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
-      // Expand tokens in each system-prompt entry in-place.
+      // Remove author comments, then expand tokens in each system-prompt entry in-place.
       for (let i = 0; i < output.system.length; i++) {
-        const entry = output.system[i];
+        const entry = stripComments(output.system[i]);
+        output.system[i] = entry;
         if (!hasExpandableToken(entry)) continue;
         logger?.log(`system[${i}]: expanding tokens (${entry.length} chars)`);
         output.system[i] = await expand(entry, process.cwd(), effectiveOptions, createContext());
