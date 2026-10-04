@@ -77,11 +77,11 @@ export function stripComments(
   errors?: number[],
   removed?: { start: number; end: number }[],
 ): string {
-  if (text.indexOf(COMMENT_START) === -1) return text;
+  let start = text.indexOf(COMMENT_START);
+  if (start === -1) return text;
 
   let out = "";
   let cursor = 0;
-  let lineStart = 0;
   // Start of text counts as blank, so a leading comment drops the blank line after it.
   let prevBlank = true;
   // Last `--->` found. Openers before it share it, so the search runs once per closer.
@@ -89,21 +89,16 @@ export function stripComments(
   let closeLineEnd = 0;
   let closeValid = false;
 
-  while (lineStart < text.length) {
-    // Find this line's bounds and its first non-blank character.
-    const lineEnd = findLineEnd(text, lineStart);
-    const nextLine = lineEnd < text.length ? lineEnd + 1 : lineEnd;
-    const contentStart = skipBlank(text, lineStart, lineEnd);
-
-    // Ordinary lines pass through.
-    if (!text.startsWith(COMMENT_START, contentStart)) {
-      prevBlank = contentStart === lineEnd;
-      lineStart = nextLine;
+  while (start !== -1) {
+    // Check only the whitespace before each marker, skipping ordinary lines.
+    const lineStart = findBlankLineStart(text, start);
+    if (lineStart === -1) {
+      start = text.indexOf(COMMENT_START, start + COMMENT_START.length);
       continue;
     }
 
     // Find the closing marker, reusing the last one when it is still ahead.
-    const bodyStart = contentStart + COMMENT_START.length;
+    const bodyStart = start + COMMENT_START.length;
     if (closeStart < bodyStart) {
       closeStart = text.indexOf(COMMENT_END, bodyStart);
       if (closeStart !== -1) {
@@ -115,16 +110,20 @@ export function stripComments(
 
     // An unclosed comment leaves the rest of the text literal.
     if (closeStart === -1) {
-      errors?.push(contentStart);
+      errors?.push(start);
       break;
     }
 
-    // A comment with text after `--->` stays literal; scanning resumes on the next line.
+    // Keep malformed comments and look for the next marker.
     if (!closeValid) {
-      errors?.push(contentStart);
-      prevBlank = false;
-      lineStart = nextLine;
+      errors?.push(start);
+      start = text.indexOf(COMMENT_START, bodyStart);
       continue;
+    }
+
+    // Check the preceding retained line; adjacent removals share its blank state.
+    if (lineStart > cursor) {
+      prevBlank = findBlankLineStart(text, lineStart - 1, cursor) !== -1;
     }
 
     // Drop the comment's lines, plus one blank line if blank lines surround it.
@@ -138,10 +137,20 @@ export function stripComments(
     }
     removed?.push({ start: lineStart, end: resume });
     cursor = resume;
-    lineStart = resume;
+    start = text.indexOf(COMMENT_START, resume);
   }
 
   return cursor === 0 ? text : out + text.slice(cursor);
+}
+
+/** Return the line start if only spaces, tabs and `\r` precede `end`, or -1 otherwise. */
+function findBlankLineStart(text: string, end: number, minimum = 0): number {
+  for (let i = end - 1; i >= minimum; i--) {
+    const code = text.charCodeAt(i);
+    if (code === 10) return i + 1;
+    if (code !== 32 && code !== 9 && code !== 13) return -1;
+  }
+  return minimum;
 }
 
 /** Return the index of the `\n` ending the line at `start`, or `text.length`. */
