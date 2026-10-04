@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { defaultConfigDirs } from "./config-discovery";
 import { MdExpandPlugin, resolveEffectiveConfigDirs } from "./index";
-import { cleanup, makeTmpDir } from "./test-helpers";
+import { cleanup, makeTmpDir, withEnv } from "./test-helpers";
 
 describe("resolveEffectiveConfigDirs", () => {
   const projectDir = "/project";
@@ -91,6 +91,42 @@ describe("MdExpandPlugin cache option", () => {
       "name=Alice",
     );
     expect(await transformSystem(transform, `{{ file="./tmpl.txt" name=Bob }}`)).toBe("name=Bob");
+  });
+});
+
+describe("MdExpandPlugin author comments", () => {
+  test("system_prompt_should_drop_comments_when_no_tokens_present", async () => {
+    // Arrange
+    const dir = await makeTmpDir({});
+    cleanup.push(dir);
+    const transform = await createSystemTransform(dir, {});
+
+    // Act
+    const result = await transformSystem(transform, "a\n<!---\nnote\n--->\nb <!-- keep -->");
+
+    // Assert
+    expect(result).toBe("a\nb <!-- keep -->");
+  });
+
+  test("system_prompt_should_not_expand_tokens_inside_comments", async () => {
+    // Arrange
+    const dir = await makeTmpDir({});
+    cleanup.push(dir);
+    const transform = await createSystemTransform(dir, {});
+    const restore = withEnv("MD_EXPAND_COMMENT_TEST", "LEAKED");
+
+    try {
+      // Act
+      const result = await transformSystem(
+        transform,
+        "```\n<!--- {{env:MD_EXPAND_COMMENT_TEST}} --->\n```",
+      );
+
+      // Assert
+      expect(result).toBe("```\n```");
+    } finally {
+      restore();
+    }
   });
 });
 

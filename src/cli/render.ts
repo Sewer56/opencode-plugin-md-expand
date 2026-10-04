@@ -5,6 +5,7 @@ import { defaultConfigDirs } from "../config-discovery";
 import { createDebugLogger } from "../debug";
 import { expand } from "../expand";
 import { resolveMdExpandOptions, type MdExpandOptions } from "../options";
+import { stripComments } from "../template/comments";
 
 export interface RenderOptions {
   inputFile: string;
@@ -48,7 +49,7 @@ export async function executeRender(
 
   let input: string;
   try {
-    input = (await Bun.file(inputPath).text()).trim();
+    input = stripComments(await Bun.file(inputPath).text()).trim();
   } catch (err: unknown) {
     console.error(`render: cannot read input file: ${inputPath}`);
     console.error((err as Error).message);

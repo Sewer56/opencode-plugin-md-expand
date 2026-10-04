@@ -6,6 +6,7 @@ import type { ExpandContext } from "../expand";
 import type { ResolvedMdExpandOptions } from "../options";
 import { resolvePath } from "../path-resolver";
 import { advanceRangeIndex, isInRange, type ProtectedRange } from "../ranges";
+import { stripComments } from "../template/comments";
 import { shouldExpandForCondition } from "../template/conditions";
 import { hasExpandableToken } from "../template/detection";
 import { parseFileTemplate } from "../template/file-parser";
@@ -226,7 +227,8 @@ function readExpandedFile(
 }
 
 /**
- * Read raw file content (trimmed), with multi-configDir fallback for relative paths.
+ * Read raw file content with multi-configDir fallback for relative paths.
+ * The content has `<!--- --->` comments removed and whitespace trimmed.
  *
  * For relative paths that are not found at the primary resolved location, each
  * directory in `options.configDirs` is tried in order. This lets the plugin
@@ -261,7 +263,7 @@ async function readRawFile(
     return EMPTY_EXPANSION_MARKER;
   }
   try {
-    const raw = (await Bun.file(resolved).text()).trim();
+    const raw = stripFileComments(await Bun.file(resolved).text(), resolved, ctx).trim();
     logger?.log(`file: ${token} → ${resolved} (${raw.length} chars)`);
     return raw.length ? raw : EMPTY_EXPANSION_MARKER;
   } catch (err: unknown) {
@@ -292,7 +294,11 @@ async function readRawFile(
       const configResolved = path.resolve(configDir, rawPath);
       if (configResolved === resolved) continue; // Already tried the primary location.
       try {
-        const content = (await Bun.file(configResolved).text()).trim();
+        const content = stripFileComments(
+          await Bun.file(configResolved).text(),
+          configResolved,
+          ctx,
+        ).trim();
         logger?.log(
           `file: ${token} → ${configResolved} (${content.length} chars) [config dir fallback]`,
         );
@@ -326,6 +332,28 @@ async function readRawFile(
     });
     return EMPTY_EXPANSION_MARKER;
   }
+}
+
+/**
+ * Remove author comments from an included file's text.
+ *
+ * @param source   - Full file text as read from disk.
+ * @param filePath - Absolute path of the file, for error reports.
+ * @param ctx      - Shared expansion context.
+ * @returns The file text with well-formed comments removed.
+ *
+ * # Errors
+ *
+ * Malformed comments stay in the text.
+ * When validation supplies `ctx.commentErrors`, they are also recorded there
+ * with the file's path and original text.
+ */
+function stripFileComments(source: string, filePath: string, ctx: ExpandContext): string {
+  if (!ctx.commentErrors) return stripComments(source);
+  const offsets: number[] = [];
+  const text = stripComments(source, offsets);
+  if (offsets.length) ctx.commentErrors.push({ path: filePath, text: source, offsets });
+  return text;
 }
 
 /**
@@ -406,6 +434,7 @@ async function recursivelyExpand(
     expandedFileCache: ctx.expandedFileCache,
     args,
     diagnostics: ctx.diagnostics,
+    commentErrors: ctx.commentErrors,
     options: ctx.options ?? options,
     logger: ctx.logger,
   });

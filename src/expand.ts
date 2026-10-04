@@ -2,6 +2,7 @@ import { createDebugLogger } from "./debug";
 import type { DebugLogger } from "./debug";
 import type { ResolvedMdExpandOptions } from "./options";
 import { mergeRanges } from "./ranges";
+import type { CommentErrors } from "./template/comments";
 import {
   hasExpandableToken,
   hasFileTemplate,
@@ -47,6 +48,8 @@ export interface ExpandContext {
   args: Map<string, string>;
   /** Optional diagnostics sink used by validation tooling. Runtime expansion stays silent. */
   diagnostics?: ExpansionDiagnostic[];
+  /** Optional sink for malformed comments in included files. Used only by validation. */
+  commentErrors?: CommentErrors[];
   /** Optional resolved options reference for configDirs fallback and logging. */
   options?: ResolvedMdExpandOptions;
   /** Optional debug logger. Set by expand() entry points when options.debug is true. */

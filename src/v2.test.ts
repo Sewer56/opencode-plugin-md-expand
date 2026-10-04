@@ -54,6 +54,21 @@ describe("handleSessionEvent", () => {
     expect(event.messages![1]!.parts![0]!.text).toContain("{{ file");
   });
 
+  test("comments_should_be_removed_from_system_but_kept_in_user_text", async () => {
+    // Arrange
+    const comment = "<!--- note --->\n";
+    const event = fakeEvent();
+    event.system = [{ type: "text", text: `${comment}agent prompt` }];
+    event.messages![0]!.parts![0]!.text = `${comment}{{arg:missing}}x`;
+
+    // Act
+    await handleSessionEvent(event, { options: opts(), createContext });
+
+    // Assert
+    expect(event.system![0]!.text).toBe("agent prompt");
+    expect(event.messages![0]!.parts![0]!.text).toBe(`${comment}x`);
+  });
+
   test("plain_parts_should_be_untouched_when_no_tokens_present", async () => {
     const event = fakeEvent();
     event.system = [{ type: "text", text: "custom agent prompt" }];

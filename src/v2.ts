@@ -13,6 +13,7 @@ import { expand, hasExpandableToken } from "./expand";
 import type { ExpandContext } from "./expand";
 import type { MdExpandOptions, ResolvedMdExpandOptions } from "./options";
 import { resolveMdExpandOptions } from "./options";
+import { stripComments } from "./template/comments";
 import { PLUGIN_ID } from "./v1";
 
 /** Session event kinds that carry a mutable `system` array. */
@@ -123,8 +124,9 @@ export default {
 /**
  * Expand templates in a session event without replacing the event.
  *
- * System text and user message text use the V1 expansion engine. Other
- * messages and non-text parts stay unchanged.
+ * The expansion engine handles system text and user messages.
+ * System text also loses its `<!--- --->` author comments.
+ * Other messages and non-text parts stay unchanged.
  *
  * @param event - Session event (`context`, `compaction` or `generate`) to edit.
  * @param input - Resolved options, context factory and optional logger.
@@ -136,13 +138,17 @@ export async function handleSessionEvent(
 ): Promise<void> {
   const { options, createContext, logger } = input;
 
+  // Remove author comments from system text, then expand its tokens.
   for (let i = 0; i < (event.system?.length ?? 0); i++) {
     const part = event.system![i]!;
-    if (typeof part.text !== "string" || !hasExpandableToken(part.text)) continue;
+    if (typeof part.text !== "string") continue;
+    part.text = stripComments(part.text);
+    if (!hasExpandableToken(part.text)) continue;
     logger?.log(`v2 system[${i}]: expanding tokens (${part.text.length} chars)`);
     part.text = await expand(part.text, process.cwd(), options, createContext());
   }
 
+  // Expand tokens in user text; comments stay because users may paste HTML.
   for (const message of event.messages ?? []) {
     const role = message.info?.role ?? message.role;
     if (role !== "user") continue;

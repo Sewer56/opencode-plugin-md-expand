@@ -32,18 +32,21 @@ describe("executeRender", () => {
     expect(output).toBe("Hello World!");
   });
 
-  test("writes to output file", async () => {
-    const dir = await makeTmpDir({
-      "input.md": "Test content",
-    });
+  test.each([
+    { name: "plain text", input: "Test content", expected: "Test content" },
+    { name: "author comment", input: "<!--- note --->\nVisible", expected: "Visible" },
+  ])("writes to output file with $name", async ({ input, expected }) => {
+    // Arrange
+    const dir = await makeTmpDir({ "input.md": input });
     cleanup.push(dir);
-
     const outputPath = path.join(dir, "output.txt");
+
+    // Act
     const exitCode = await executeRender("input.md", outputPath, { configDir: dir });
 
+    // Assert
     expect(exitCode).toBe(0);
-    const written = await Bun.file(outputPath).text();
-    expect(written).toBe("Test content");
+    expect(await Bun.file(outputPath).text()).toBe(expected);
   });
 
   test("returns 1 on missing input file", async () => {
